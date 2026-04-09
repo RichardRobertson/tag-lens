@@ -3,6 +3,7 @@
     "displayName": "Tag Lens",
     "description": "Spiritual successor to Todo Tree by Gruntfuggly",
     "version": "0.1.0",
+    "publisher": "Richard Robertson",
     "author": {
         "name": "Richard Robertson",
         "url": "https://github.com/RichardRobertson"
@@ -10,6 +11,9 @@
     "repository": {
         "type": "git",
         "url": "https://github.com/RichardRobertson/tag-lens.git"
+    },
+    "bugs": {
+        "url": "https://github.com/RichardRobertson/tag-lens/issues"
     },
     "engines": {
         "vscode": "^1.110.0"
@@ -25,7 +29,26 @@
                 "command": "tag-lens.helloWorld",
                 "title": "Hello World"
             }
-        ]
+        ],
+        "configuration": [],
+        "views": {
+            "tag-lens-tree-container": [
+                {
+                    "id": "tag-lens.tree-view",
+                    "name": "%tag-lens.tree-view.name%",
+                    "icon": "$(list-tree)"
+                }
+            ]
+        },
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "tag-lens-tree-container",
+                    "title": "%tag-lens.tree-container.name%",
+                    "icon": "$(list-tree)"
+                }
+            ]
+        }
     },
     "scripts": {
         "vscode:prepublish": "npm run package",
