@@ -1,9 +1,9 @@
 {
     "name": "tag-lens",
     "displayName": "Tag Lens",
-    "description": "Spiritual successor to Todo Tree by Gruntfuggly",
+    "description": "Visual Studio Code extension for locating and highlighting user defined tags",
     "version": "0.1.0",
-    "publisher": "Richard Robertson",
+    "publisher": "richard-robertson",
     "author": {
         "name": "Richard Robertson",
         "url": "https://github.com/RichardRobertson"
