@@ -5,7 +5,7 @@
         "lib": ["ES2022"],
         "sourceMap": true,
         "paths": {
-            "@generated": ["./generated"]
+            "@generated/*": ["./generated/*"]
         },
         "strict": true
     },
