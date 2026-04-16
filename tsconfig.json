@@ -4,6 +4,9 @@
         "target": "ES2022",
         "lib": ["ES2022"],
         "sourceMap": true,
+        "paths": {
+            "@generated": ["./generated"]
+        },
         "strict": true
     },
     "include": ["src", "generated"]
