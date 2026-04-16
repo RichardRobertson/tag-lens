@@ -62,7 +62,8 @@
         "pretest": "npm run compile-tests && npm run compile && npm run lint",
         "check-types": "tsc --noEmit",
         "lint": "biome check",
-        "test": "vscode-test"
+        "test": "vscode-test",
+        "vscode-manifest-types": "vscode-manifest-types"
     },
     "devDependencies": {
         "@biomejs/biome": "2.4.10",
@@ -75,5 +76,8 @@
         "npm-run-all": "^4.1.5",
         "typescript": "^5.9.3",
         "vscode-manifest-types": "github:RichardRobertson/vscode-manifest-types#v0.2.0"
+    },
+    "dependencies": {
+        "@vscode/ripgrep": "^1.17.1"
     }
 }
