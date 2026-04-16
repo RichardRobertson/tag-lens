@@ -26,16 +26,134 @@
     "contributes": {
         "commands": [
             {
-                "command": "tag-lens.helloWorld",
-                "title": "Hello World"
+                "command": "tag-lens.rescanWorkspace",
+                "title": "%tag-lens.commands.rescanWorkspace.title%"
             }
         ],
-        "configuration": [],
+        "configuration": {
+            "title": "%tag-lens%",
+            "properties": {
+                "tag-lens.tags": {
+                    "order": 0,
+                    "title": "%tag-lens.configuration.tags.title%",
+                    "markdownDescription": "%tag-lens.configuration.tags.markdownDescription%",
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "pattern": {
+                                "type": "string",
+                                "markdownDescription": "%tag-lens.configuration.tags[*].pattern.markdownDescription%"
+                            },
+                            "isRegex": {
+                                "type": "boolean",
+                                "markdownDescription": "%tag-lens.configuration.tags[*].isRegex.markdownDescription%"
+                            },
+                            "isRegexMultiLine": {
+                                "type": "boolean",
+                                "markdownDescription": "%tag-lens.configuration.tags[*].isRegexMultiLine.markdownDescription%"
+                            },
+                            "decorationStyle": {
+                                "type": "string",
+                                "markdownDescription": "%tag-lens.configuration.tags[*].decorationStyle.markdownDescription%"
+                            },
+                            "decorateCaptureGroup": {
+                                "type": "string",
+                                "markdownDescription": "%tag-lens.configuration.tags[*].decorate.markdownDescription%"
+                            },
+                            "diagnosticSeverity": {
+                                "type": "string",
+                                "markdownDescription": "%tag-lens.configuration.tags[*].diagnosticSeverity.markdownDescription%",
+                                "enum": [
+                                    "none",
+                                    "error",
+                                    "warning",
+                                    "information",
+                                    "hint"
+                                ],
+                                "markdownEnumDescriptions": [
+                                    "%tag-lens.configuration.tags[*].diagnosticSeverity.none.markdownDescription%",
+                                    "%tag-lens.configuration.tags[*].diagnosticSeverity.error.markdownDescription%",
+                                    "%tag-lens.configuration.tags[*].diagnosticSeverity.warning.markdownDescription%",
+                                    "%tag-lens.configuration.tags[*].diagnosticSeverity.information.markdownDescription%",
+                                    "%tag-lens.configuration.tags[*].diagnosticSeverity.hint.markdownDescription%"
+                                ]
+                            },
+                            "diagnosticMessage": {
+                                "type": "string",
+                                "markdownDescription": "%tag-lens.configuration.tags[*].diagnosticMessage.markdownDescription%"
+                            }
+                        }
+                    },
+                    "default": []
+                },
+                "tag-lens.styles": {
+                    "order": 1,
+                    "title": "%tag-lens.configuration.styles.title%",
+                    "markdownDescription": "%tag-lens.configuration.styles.markdownDescription%",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                            "foregroundColor": {
+                                "type": "string",
+                                "markdownDescription": "%tag-lens.configuration.styles[*].foregroundColor.markdownDescription%",
+                                "format": "color-hex"
+                            },
+                            "backgroundColor": {
+                                "type": "string",
+                                "markdownDescription": "%tag-lens.configuration.styles[*].backgroundColor.markdownDescription%",
+                                "format": "color-hex"
+                            },
+                            "bold": {
+                                "type": "boolean",
+                                "markdownDescription": "%tag-lens.configuration.styles[*].bold.markdownDescription%"
+                            },
+                            "italic": {
+                                "type": "boolean",
+                                "markdownDescription": "%tag-lens.configuration.styles[*].italic.markdownDescription%"
+                            },
+                            "underline": {
+                                "type": "string",
+                                "markdownDescription": "%tag-lens.configuration.styles[*].underline.markdownDescription%",
+                                "enum": [
+                                    "none",
+                                    "single",
+                                    "double",
+                                    "dotted",
+                                    "wavy"
+                                ],
+                                "markdownEnumDescriptions": [
+                                    "%tag-lens.configuration.styles[*].underline.none.markdownDescription%",
+                                    "%tag-lens.configuration.styles[*].underline.single.markdownDescription%",
+                                    "%tag-lens.configuration.styles[*].underline.double.markdownDescription%",
+                                    "%tag-lens.configuration.styles[*].underline.dotted.markdownDescription%",
+                                    "%tag-lens.configuration.styles[*].underline.wavy.markdownDescription%"
+                                ]
+                            },
+                            "strikethrough": {
+                                "type": "boolean",
+                                "markdownDescription": "%tag-lens.configuration.styles[*].strikethrough.markdownDescription%"
+                            },
+                            "opacity": {
+                                "type": "number",
+                                "markdownDescription": "%tag-lens.configuration.styles[*].opacity.markdownDescription%"
+                            },
+                            "border": {
+                                "type": "string",
+                                "markdownDescription": "%tag-lens.configuration.styles[*].border.markdownDescription%"
+                            }
+                        }
+                    },
+                    "default": {}
+                }
+            }
+        },
         "views": {
             "tag-lens-tree-container": [
                 {
                     "id": "tag-lens.tree-view",
-                    "name": "%tag-lens.tree-view.name%",
+                    "name": "%tag-lens%",
                     "icon": "$(list-tree)"
                 }
             ]
@@ -44,7 +162,7 @@
             "activitybar": [
                 {
                     "id": "tag-lens-tree-container",
-                    "title": "%tag-lens.tree-container.name%",
+                    "title": "%tag-lens%",
                     "icon": "$(list-tree)"
                 }
             ]
