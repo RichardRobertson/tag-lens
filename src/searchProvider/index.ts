@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { FindFilesProvider, searchTextDocument } from "./fallback";
+import { RipgrepProvider } from "./ripgrep";
 
 export interface TagMatch {
     uri: vscode.Uri;
@@ -42,6 +43,7 @@ class SearchProviderFactory {
 }
 
 const factory: SearchProviderFactory = new SearchProviderFactory();
+factory.register(new RipgrepProvider());
 
 export async function* searchWorkspace(
     query: SearchQuery,
