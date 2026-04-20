@@ -21,7 +21,12 @@ export class FindFilesProvider implements SearchProvider {
             if (token.isCancellationRequested) {
                 return;
             }
-            const doc = await vscode.workspace.openTextDocument(file);
+            let doc: vscode.TextDocument | undefined;
+            try {
+                doc = await vscode.workspace.openTextDocument(file);
+            } catch (_) {
+                continue;
+            }
             for await (const tagMatch of searchTextDocument(query, file, doc, token)) {
                 yield tagMatch;
             }
