@@ -14,7 +14,7 @@ export class RipgrepProvider implements SearchProvider {
         query: SearchQuery,
         token: vscode.CancellationToken
     ): AsyncIterable<TagMatch> {
-        const args: string[] = ["--json", "--line_numbers"];
+        const args: string[] = ["--json", "--line-number"];
         if (query.maxResults !== undefined) {
             args.push("-m", query.maxResults.toString());
         }
@@ -34,12 +34,12 @@ export class RipgrepProvider implements SearchProvider {
         for await (const line of streamLines(rg.stdout)) {
             const jsonLine = JSON.parse(line) as RipgrepMatch;
             if (jsonLine.type === "match") {
-                const uri = vscode.Uri.file(decode(jsonLine.path));
-                const lineNumber = jsonLine.line_number;
-                const lineText = decode(jsonLine.lines);
+                const uri = vscode.Uri.file(decode(jsonLine.data.path));
+                const lineNumber = jsonLine.data.line_number;
+                const lineText = decode(jsonLine.data.lines);
                 const ranges = utf8RangesToCharRanges(
                     lineText,
-                    jsonLine.submatches.flatMap((subMatch, index): ByteTarget[] => {
+                    jsonLine.data.submatches.flatMap((subMatch, index): ByteTarget[] => {
                         return [
                             { byte: subMatch.start, kind: "start", index },
                             { byte: subMatch.end, kind: "end", index },
@@ -142,10 +142,12 @@ function escapeRegExp(str: string): string {
 
 interface RipgrepMatch {
     type: "match";
-    path: TextOrBytes;
-    lines: TextOrBytes;
-    line_number: number;
-    submatches: SubMatch[];
+    data: {
+        path: TextOrBytes;
+        lines: TextOrBytes;
+        line_number: number;
+        submatches: SubMatch[];
+    };
 }
 
 interface SubMatch {

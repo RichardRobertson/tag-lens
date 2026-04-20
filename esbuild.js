@@ -33,7 +33,7 @@ async function main() {
         sourcesContent: false,
         platform: "node",
         outfile: "dist/extension.js",
-        external: ["vscode"],
+        external: ["vscode", "@vscode/ripgrep", "@vscode/ripgrep/*"],
         logLevel: "silent",
         plugins: [
             /* add to the end of plugins array */
