@@ -45,12 +45,15 @@ export async function* searchTextDocument(
             return;
         }
         const text = doc.lineAt(line).text;
-        for (const pattern of query.patterns) {
-            if (pattern.isRegex) {
-                if (pattern.isMultiLineRegex) {
-                    throw new Error("isMultiLineRegex not implemented");
+        for (const tag of query.tags) {
+            if (tag.pattern === undefined) {
+                continue;
+            }
+            if (tag.isRegex) {
+                if (tag.isRegexMultiLine) {
+                    throw new Error("isRegexMultiLine not implemented");
                 }
-                const regex = new RegExp(pattern.value, "dg");
+                const regex = new RegExp(tag.pattern, "dg");
                 for (const match of text.matchAll(regex)) {
                     if (match.indices === undefined) {
                         yield {
@@ -70,14 +73,14 @@ export async function* searchTextDocument(
                     }
                 }
             } else {
-                const length = pattern.value.length;
-                let start = text.indexOf(pattern.value);
+                const length = tag.pattern.length;
+                let start = text.indexOf(tag.pattern);
                 while (start !== -1) {
                     yield {
                         uri: file,
                         range: new vscode.Range(line, start, line, start + length),
                     };
-                    start = text.indexOf(pattern.value, start + 1);
+                    start = text.indexOf(tag.pattern, start + 1);
                 }
             }
         }

@@ -1,3 +1,4 @@
+import type * as configuration from "@generated/configuration";
 import * as vscode from "vscode";
 import { FindFilesProvider, searchTextDocument } from "./fallback";
 import { RipgrepProvider } from "./ripgrep";
@@ -8,14 +9,8 @@ export interface TagMatch {
 }
 
 export interface SearchQuery {
-    patterns: Pattern[];
+    tags: configuration.Tags;
     maxResults?: number;
-}
-
-export interface Pattern {
-    value: string;
-    isRegex: boolean;
-    isMultiLineRegex: boolean;
 }
 
 export interface SearchProvider {

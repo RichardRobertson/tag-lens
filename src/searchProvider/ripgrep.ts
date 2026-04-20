@@ -18,12 +18,15 @@ export class RipgrepProvider implements SearchProvider {
         if (query.maxResults !== undefined) {
             args.push("-m", query.maxResults.toString());
         }
-        for (const pattern of query.patterns) {
+        for (const tag of query.tags) {
+            if (tag.pattern === undefined) {
+                continue;
+            }
             args.push("-e");
-            if (pattern.isRegex) {
-                args.push(pattern.value);
+            if (tag.isRegex) {
+                args.push(tag.pattern);
             } else {
-                args.push(escapeRegExp(pattern.value));
+                args.push(escapeRegExp(tag.pattern));
             }
         }
         args.push(folder.uri.fsPath);
