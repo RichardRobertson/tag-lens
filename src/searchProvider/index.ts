@@ -6,6 +6,7 @@ import { RipgrepProvider } from "./ripgrep";
 export interface TagMatch {
     uri: vscode.Uri;
     range: vscode.Range;
+    label: string;
 }
 
 export interface SearchQuery {

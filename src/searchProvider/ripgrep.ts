@@ -50,7 +50,11 @@ export class RipgrepProvider implements SearchProvider {
                     })
                 );
                 for (const [start, end] of ranges) {
-                    yield { uri, range: new vscode.Range(lineNumber, start, lineNumber, end) };
+                    yield {
+                        uri,
+                        range: new vscode.Range(lineNumber, start, lineNumber, end),
+                        label: line.slice(start, end),
+                    };
                 }
             }
         }

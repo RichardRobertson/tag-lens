@@ -59,6 +59,7 @@ export async function* searchTextDocument(
                         yield {
                             uri: file,
                             range: new vscode.Range(line, 0, line, text.length),
+                            label: match[0],
                         };
                     } else {
                         yield {
@@ -69,6 +70,7 @@ export async function* searchTextDocument(
                                 line,
                                 match.indices[0][1]
                             ),
+                            label: match[0],
                         };
                     }
                 }
@@ -79,6 +81,7 @@ export async function* searchTextDocument(
                     yield {
                         uri: file,
                         range: new vscode.Range(line, start, line, start + length),
+                        label: tag.pattern,
                     };
                     start = text.indexOf(tag.pattern, start + 1);
                 }
