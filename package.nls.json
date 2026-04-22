@@ -1,5 +1,5 @@
 {
-    "tag-lens.commands.rescanWorkspace.title": "Rescan Workspace",
+    "tag-lens.commands.rescanWorkspace.title": "Tag Lens: Rescan Workspace",
     "tag-lens.configuration.tags.title": "Tags",
     "tag-lens.configuration.tags.markdownDescription": "The list of tags to locate",
     "tag-lens.configuration.tags[*].pattern.markdownDescription": "The pattern to match for this tag",
@@ -28,5 +28,10 @@
     "tag-lens.configuration.styles[*].underline.wavy.markdownDescription": "Wavy underline",
     "tag-lens.configuration.styles[*].strikethrough.markdownDescription": "Add a strikethrough",
     "tag-lens.configuration.styles[*].border.markdownDescription": "A CSS border definition",
+    "tag-lens.configuration.compactFolders.title": "Compact Folders",
+    "tag-lens.configuration.compactFolders.markdownDescription": "Compact folders in tree view like #explorer.compactFolders#",
+    "tag-lens.configuration.compactFolders.editor.markdownDescription": "Match behavior of #explorer.compactFolders#",
+    "tag-lens.configuration.compactFolders.always.markdownDescription": "Always compact folders",
+    "tag-lens.configuration.compactFolders.never.markdownDescription": "Never compact folders",
     "tag-lens": "Tag Lens"
 }

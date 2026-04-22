@@ -146,6 +146,23 @@
                         }
                     },
                     "default": {}
+                },
+                "tag-lens.compactFolders": {
+                    "order": 2,
+                    "title": "%tag-lens.configuration.compactFolders.title%",
+                    "markdownDescription": "%tag-lens.configuration.compactFolders.markdownDescription%",
+                    "type": "string",
+                    "enum": [
+                        "editor",
+                        "always",
+                        "never"
+                    ],
+                    "markdownEnumDescriptions": [
+                        "%tag-lens.configuration.compactFolders.editor.markdownDescription%",
+                        "%tag-lens.configuration.compactFolders.always.markdownDescription%",
+                        "%tag-lens.configuration.compactFolders.never.markdownDescription%"
+                    ],
+                    "default": "editor"
                 }
             }
         },
