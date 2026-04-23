@@ -27,7 +27,8 @@
         "commands": [
             {
                 "command": "tag-lens.rescanWorkspace",
-                "title": "%tag-lens.commands.rescanWorkspace.title%"
+                "title": "%tag-lens.commands.rescanWorkspace.title%",
+                "icon": "$(search)"
             }
         ],
         "configuration": {
@@ -165,6 +166,15 @@
                     "default": "editor"
                 }
             }
+        },
+        "menus": {
+            "view/title": [
+                {
+                    "command": "tag-lens.rescanWorkspace",
+                    "group": "navigation",
+                    "when": "view == tag-lens.tree-view"
+                }
+            ]
         },
         "views": {
             "tag-lens-tree-container": [
