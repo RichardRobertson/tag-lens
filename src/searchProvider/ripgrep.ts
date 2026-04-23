@@ -38,7 +38,7 @@ export class RipgrepProvider implements SearchProvider {
             const jsonLine = JSON.parse(line) as RipgrepMatch;
             if (jsonLine.type === "match") {
                 const uri = vscode.Uri.file(decode(jsonLine.data.path));
-                const lineNumber = jsonLine.data.line_number;
+                const lineNumber = jsonLine.data.line_number - 1;
                 const lineText = decode(jsonLine.data.lines);
                 const ranges = utf8RangesToCharRanges(
                     lineText,
@@ -53,7 +53,7 @@ export class RipgrepProvider implements SearchProvider {
                     yield {
                         uri,
                         range: new vscode.Range(lineNumber, start, lineNumber, end),
-                        label: line.slice(start, end),
+                        label: lineText.slice(start, end),
                     };
                 }
             }
