@@ -4,7 +4,6 @@ import * as configuration from "@generated/configuration";
 import * as vscode from "vscode";
 import { openTagLinkCommand } from "./extension";
 import type { TagMatch } from "./searchProvider";
-import { isParent } from "./uri";
 
 export class TreeProvider implements vscode.TreeDataProvider<UriNode> {
     private rootNodes: WorkspaceNode[] = [];
@@ -58,18 +57,12 @@ export class TreeProvider implements vscode.TreeDataProvider<UriNode> {
     }
 
     private addTagMatch(tagMatch: TagMatch): void {
-        let best: WorkspaceNode | undefined;
-        for (const current of this.rootNodes) {
-            if (!isParent(current.resourceUri, tagMatch.uri, { inclusive: true })) {
-                continue;
-            }
-            if (
-                best === undefined ||
-                best.resourceUri.path.length > current.resourceUri.path.length
-            ) {
-                best = current;
-            }
-        }
+        const workspaceFolder = vscode.workspace
+            .getWorkspaceFolder(tagMatch.uri)
+            ?.uri.toString(true);
+        const best = this.rootNodes.find(
+            (rootNode) => rootNode.resourceUri.toString(true) === workspaceFolder
+        );
         let file: FileNode | undefined;
         if (best === undefined) {
             if (tagMatch.uri.scheme === "untitled") {
@@ -184,14 +177,6 @@ abstract class ContainerNode<T extends UriNode> extends UriNode {
 
     addChild(child: T): void {
         this.nodes.push(child);
-    }
-
-    getChildByUri(uri: vscode.Uri): T | undefined {
-        for (const child of this.nodes) {
-            if (isParent(child.resourceUri, uri, { inclusive: true })) {
-                return child;
-            }
-        }
     }
 
     isEmpty(): boolean {
