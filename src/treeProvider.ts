@@ -1,7 +1,6 @@
 import assert from "node:assert";
 import * as posix from "node:path/posix";
 import * as configuration from "@generated/configuration";
-import * as views from "@generated/views";
 import * as vscode from "vscode";
 import { openTagLinkCommand } from "./extension";
 import type { TagMatch } from "./searchProvider";
@@ -290,16 +289,16 @@ class WorkspaceNode extends FolderNode {
             vscode.Uri.from({ scheme: "untitled" }),
             "untitled",
             new vscode.ThemeIcon("symbol-file"),
-            vscode.l10n.t(`tag-lens.views.${views.treeView}.untitled.label`)
+            vscode.l10n.t("Untitled")
         );
     }
 
     static newExternal(): WorkspaceNode {
         return new WorkspaceNode(
             vscode.Uri.from({ scheme: "" }),
-            "orphaned",
+            "external",
             new vscode.ThemeIcon("symbol-file"),
-            vscode.l10n.t(`tag-lens.views.${views.treeView}.external.label`)
+            vscode.l10n.t("External")
         );
     }
 

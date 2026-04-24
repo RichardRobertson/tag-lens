@@ -33,8 +33,5 @@
     "tag-lens.configuration.compactFolders.editor.markdownDescription": "Match behavior of `#explorer.compactFolders#`",
     "tag-lens.configuration.compactFolders.always.markdownDescription": "Always compact folders",
     "tag-lens.configuration.compactFolders.never.markdownDescription": "Never compact folders",
-    "tag-lens.views.tag-lens.tree-view.badge.tooltip": "Scanning workspace",
-    "tag-lens.views.tag-lens.tree-view.untitled.label": "Untitled",
-    "tag-lens.views.tag-lens.tree-view.external.label": "External",
     "tag-lens": "Tag Lens"
 }

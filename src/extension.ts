@@ -23,12 +23,12 @@ export function activate(context: vscode.ExtensionContext): void {
             {
                 location: { viewId: views.treeView },
                 cancellable: true,
-                title: vscode.l10n.t("tag-lens.commands.rescanWorkspace.title"),
+                title: vscode.l10n.t("Scanning workspace"),
             },
             async (_progress, token) => {
                 token.onCancellationRequested(scanDebounced.cancel);
                 treeView.badge = {
-                    tooltip: vscode.l10n.t(`tag-lens.views.${views.treeView}.badge.tooltip`),
+                    tooltip: vscode.l10n.t("Scanning workspace"),
                     value: 1,
                 };
                 await treeProvider.withNewTree(async (addTagMatch) => {
