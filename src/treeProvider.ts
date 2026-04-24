@@ -72,7 +72,11 @@ export class TreeProvider implements vscode.TreeDataProvider<UriNode> {
         }
         let file: FileNode | undefined;
         if (best === undefined) {
-            file = this.externalNode.getOrCreateFile(tagMatch.uri);
+            if (tagMatch.uri.scheme === "untitled") {
+                file = this.untitledNode.getOrCreateFile(tagMatch.uri);
+            } else {
+                file = this.externalNode.getOrCreateFile(tagMatch.uri);
+            }
         } else {
             const relative = posix.relative(best.resourceUri.path, tagMatch.uri.path);
             const segments = relative.split("/");
