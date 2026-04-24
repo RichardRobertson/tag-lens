@@ -33,5 +33,11 @@
     "tag-lens.configuration.compactFolders.editor.markdownDescription": "Match behavior of `#explorer.compactFolders#`",
     "tag-lens.configuration.compactFolders.always.markdownDescription": "Always compact folders",
     "tag-lens.configuration.compactFolders.never.markdownDescription": "Never compact folders",
+    "tag-lens.configuration.search.workspace.title": "Search Workspace Folders",
+    "tag-lens.configuration.search.workspace.markdownDescription": "Search for tags in files that belong to active workspace folders",
+    "tag-lens.configuration.search.untitled.title": "Search Untitled Editors",
+    "tag-lens.configuration.search.untitled.markdownDescription": "Search for tags in open untitled editors",
+    "tag-lens.configuration.search.external.title": "Search External Editors",
+    "tag-lens.configuration.search.external.markdownDescription": "Search for tags in open non-workspace editors",
     "tag-lens": "Tag Lens"
 }

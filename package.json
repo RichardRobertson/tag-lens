@@ -165,6 +165,27 @@
                         "%tag-lens.configuration.compactFolders.never.markdownDescription%"
                     ],
                     "default": "editor"
+                },
+                "tag-lens.search.workspace": {
+                    "order": 3,
+                    "title": "%tag-lens.configuration.search.workspace.title%",
+                    "markdownDescription": "%tag-lens.configuration.search.workspace.markdownDescription%",
+                    "type": "boolean",
+                    "default": true
+                },
+                "tag-lens.search.untitled": {
+                    "order": 4,
+                    "title": "%tag-lens.configuration.search.untitled.title%",
+                    "markdownDescription": "%tag-lens.configuration.search.untitled.markdownDescription%",
+                    "type": "boolean",
+                    "default": true
+                },
+                "tag-lens.search.external": {
+                    "order": 5,
+                    "title": "%tag-lens.configuration.search.external.title%",
+                    "markdownDescription": "%tag-lens.configuration.search.external.markdownDescription%",
+                    "type": "boolean",
+                    "default": true
                 }
             }
         },
