@@ -48,7 +48,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
     context.subscriptions.push(
         vscode.commands.registerCommand(commands.rescanWorkspace, scan),
-        vscode.workspace.onDidChangeTextDocument(() => scanDebounced),
+        vscode.workspace.onDidChangeTextDocument(async () => {
+            await scanDebounced();
+        }),
         vscode.commands.registerCommand(
             openTagLinkCommand,
             async (uri: vscode.Uri, range: vscode.Range) => {
