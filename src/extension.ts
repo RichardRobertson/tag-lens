@@ -3,7 +3,7 @@ import * as configuration from "@generated/configuration";
 import * as views from "@generated/views";
 import { debounce } from "ts-debounce";
 import * as vscode from "vscode";
-import { searchWorkspaceAndUnsavedEditors } from "./searchProvider";
+import { search } from "./searchProvider";
 import { TreeProvider } from "./treeProvider";
 
 export const openTagLinkCommand = "tag-lens.openTagLink";
@@ -32,10 +32,7 @@ export function activate(context: vscode.ExtensionContext): void {
                     value: 1,
                 };
                 await treeProvider.withNewTree(async (addTagMatch) => {
-                    for await (const tagMatch of searchWorkspaceAndUnsavedEditors(
-                        { tags: configuration.getTags() },
-                        token
-                    )) {
+                    for await (const tagMatch of search({ tags: configuration.getTags() }, token)) {
                         addTagMatch(tagMatch);
                     }
                 });

@@ -1,4 +1,4 @@
-import type * as configuration from "@generated/configuration";
+import * as configuration from "@generated/configuration";
 import * as vscode from "vscode";
 import { FindFilesProvider, searchTextDocument } from "./fallback";
 import { RipgrepProvider } from "./ripgrep";
@@ -41,20 +41,35 @@ class SearchProviderFactory {
 const factory: SearchProviderFactory = new SearchProviderFactory();
 factory.register(new RipgrepProvider());
 
-export async function* searchWorkspace(
+async function* searchWorkspace(
     query: SearchQuery,
     token: vscode.CancellationToken
 ): AsyncIterable<TagMatch> {
+    const unsavedUris = new Set<string>();
+    for (const document of vscode.workspace.textDocuments) {
+        if (
+            !unsavedUris.has(document.uri.toString(true)) &&
+            document.isDirty &&
+            vscode.workspace.getWorkspaceFolder(document.uri) !== undefined
+        ) {
+            unsavedUris.add(document.uri.toString(true));
+            for await (const tagMatch of searchTextDocument(query, document.uri, document, token)) {
+                yield tagMatch;
+            }
+        }
+    }
     const folders = vscode.workspace.workspaceFolders ?? [];
     for (const folder of folders) {
         const provider = factory.getProvider(folder);
         for await (const tagMatch of provider.search(folder, query, token)) {
-            yield tagMatch;
+            if (!unsavedUris.has(tagMatch.uri.toString(true))) {
+                yield tagMatch;
+            }
         }
     }
 }
 
-export async function* searchUnsavedEditors(
+async function* searchUntitledEditors(
     query: SearchQuery,
     token: vscode.CancellationToken
 ): AsyncIterable<TagMatch> {
@@ -67,18 +82,30 @@ export async function* searchUnsavedEditors(
     }
 }
 
-export async function* searchWorkspaceAndUnsavedEditors(
+async function* searchExternalEditors(
     query: SearchQuery,
     token: vscode.CancellationToken
 ): AsyncIterable<TagMatch> {
-    const seenUris = new Set<string>();
-    for await (const tagMatch of searchUnsavedEditors(query, token)) {
-        seenUris.add(tagMatch.uri.toString());
-        yield tagMatch;
-    }
-    for await (const tagMatch of searchWorkspace(query, token)) {
-        if (!seenUris.has(tagMatch.uri.toString())) {
-            yield tagMatch;
+    for (const document of vscode.workspace.textDocuments) {
+        if (vscode.workspace.getWorkspaceFolder(document.uri) === undefined) {
+            for await (const tagMatch of searchTextDocument(query, document.uri, document, token)) {
+                yield tagMatch;
+            }
         }
+    }
+}
+
+export async function* search(
+    query: SearchQuery,
+    token: vscode.CancellationToken
+): AsyncIterable<TagMatch> {
+    if (!token.isCancellationRequested && configuration.search.getUntitled()) {
+        yield* searchUntitledEditors(query, token);
+    }
+    if (!token.isCancellationRequested && configuration.search.getExternal()) {
+        yield* searchExternalEditors(query, token);
+    }
+    if (!token.isCancellationRequested && configuration.search.getWorkspace()) {
+        yield* searchWorkspace(query, token);
     }
 }
