@@ -32,6 +32,7 @@ export function activate(context: vscode.ExtensionContext): void {
                 },
                 async (_progress, token) => {
                     const stackedTokenSource = new vscode.CancellationTokenSource();
+                    scanCancellationTokenSource = stackedTokenSource;
                     token.onCancellationRequested(() => {
                         scanDebounced.cancel();
                         stackedTokenSource.cancel();
