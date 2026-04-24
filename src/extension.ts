@@ -77,6 +77,11 @@ export function activate(context: vscode.ExtensionContext): void {
                 }
             }
         ),
+        vscode.workspace.onDidChangeConfiguration(async (e) => {
+            if (e.affectsConfiguration(configuration.section)) {
+                await scanDebounced();
+            }
+        }),
         treeView
     );
 
