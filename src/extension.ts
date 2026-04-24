@@ -9,15 +9,16 @@ import { TreeProvider } from "./treeProvider";
 export const openTagLinkCommand = "tag-lens.openTagLink";
 
 export function activate(context: vscode.ExtensionContext): void {
-    console.log('Congratulations, your extension "tag-lens" is now active!');
-
     const treeProvider = new TreeProvider();
 
     const treeView = vscode.window.createTreeView(views.treeView, {
         treeDataProvider: treeProvider,
     });
 
+    let scanCancellationTokenSource: vscode.CancellationTokenSource | undefined;
+
     async function scan(): Promise<void> {
+        scanCancellationTokenSource?.cancel();
         scanDebounced.cancel();
         await vscode.window.withProgress(
             {
@@ -26,19 +27,27 @@ export function activate(context: vscode.ExtensionContext): void {
                 title: vscode.l10n.t("Scanning workspace"),
             },
             async (_progress, token) => {
-                token.onCancellationRequested(scanDebounced.cancel);
+                const stackedTokenSource = new vscode.CancellationTokenSource();
+                token.onCancellationRequested(() => {
+                    scanDebounced.cancel();
+                    stackedTokenSource.cancel();
+                });
                 treeView.badge = {
                     tooltip: vscode.l10n.t("Scanning workspace"),
                     value: 1,
                 };
                 await treeProvider.withNewTree(async (addTagMatch) => {
-                    for await (const tagMatch of search({ tags: configuration.getTags() }, token)) {
+                    for await (const tagMatch of search(
+                        { tags: configuration.getTags() },
+                        stackedTokenSource.token
+                    )) {
                         addTagMatch(tagMatch);
                     }
                 });
                 treeView.badge = undefined;
             }
         );
+        scanCancellationTokenSource = undefined;
     }
 
     const scanDebounced = debounce(scan, 1000);
