@@ -18,36 +18,44 @@ export function activate(context: vscode.ExtensionContext): void {
     let scanCancellationTokenSource: vscode.CancellationTokenSource | undefined;
 
     async function scan(): Promise<void> {
-        scanCancellationTokenSource?.cancel();
+        if (scanCancellationTokenSource !== undefined) {
+            scanCancellationTokenSource.cancel();
+            scanCancellationTokenSource.dispose();
+        }
         scanDebounced.cancel();
-        await vscode.window.withProgress(
-            {
-                location: { viewId: views.treeView },
-                cancellable: true,
-                title: vscode.l10n.t("Scanning workspace"),
-            },
-            async (_progress, token) => {
-                const stackedTokenSource = new vscode.CancellationTokenSource();
-                token.onCancellationRequested(() => {
-                    scanDebounced.cancel();
-                    stackedTokenSource.cancel();
-                });
-                treeView.badge = {
-                    tooltip: vscode.l10n.t("Scanning workspace"),
-                    value: 1,
-                };
-                await treeProvider.withNewTree(async (addTagMatch) => {
-                    for await (const tagMatch of search(
-                        { tags: configuration.getTags() },
-                        stackedTokenSource.token
-                    )) {
-                        addTagMatch(tagMatch);
-                    }
-                });
-                treeView.badge = undefined;
-            }
-        );
-        scanCancellationTokenSource = undefined;
+        try {
+            await vscode.window.withProgress(
+                {
+                    location: { viewId: views.treeView },
+                    cancellable: true,
+                    title: vscode.l10n.t("Scanning workspace"),
+                },
+                async (_progress, token) => {
+                    const stackedTokenSource = new vscode.CancellationTokenSource();
+                    token.onCancellationRequested(() => {
+                        scanDebounced.cancel();
+                        stackedTokenSource.cancel();
+                        stackedTokenSource.dispose();
+                    });
+                    treeView.badge = {
+                        tooltip: vscode.l10n.t("Scanning workspace"),
+                        value: 1,
+                    };
+                    await treeProvider.withNewTree(async (addTagMatch) => {
+                        for await (const tagMatch of search(
+                            { tags: configuration.getTags() },
+                            stackedTokenSource.token
+                        )) {
+                            addTagMatch(tagMatch);
+                        }
+                    });
+                    treeView.badge = undefined;
+                }
+            );
+        } finally {
+            scanCancellationTokenSource?.dispose();
+            scanCancellationTokenSource = undefined;
+        }
     }
 
     const scanDebounced = debounce(scan, 1000);
