@@ -86,7 +86,9 @@ export class TreeProvider implements vscode.TreeDataProvider<UriNode> {
             }
         }
         assert(file);
-        file.addChild(new TagNode(tagMatch.uri, tagMatch.range, tagMatch.label));
+        file.addChild(
+            new TagNode(tagMatch.uri, tagMatch.range, tagMatch.match[0], tagMatch.tagIndex)
+        );
     }
 
     private endNewTree(): void {
@@ -318,7 +320,12 @@ class FileNode extends ContainerNode<TagNode> {
 }
 
 class TagNode extends UriNode {
-    constructor(resourceUri: vscode.Uri, range: vscode.Range, label: string) {
+    constructor(
+        resourceUri: vscode.Uri,
+        range: vscode.Range,
+        label: string,
+        readonly tagIndex: number
+    ) {
         const rangeString = `L${range.start.line}:${range.start.character}-L${range.end.line}:${range.end.character}`;
         resourceUri = resourceUri.with({
             fragment: rangeString,

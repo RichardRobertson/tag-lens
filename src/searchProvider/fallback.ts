@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { SearchProvider, SearchQuery, TagMatch } from ".";
+import { makeMatch, type SearchProvider, type SearchQuery, type TagMatch } from ".";
 
 export class FindFilesProvider implements SearchProvider {
     supports(_uri: vscode.Uri): boolean {
@@ -45,7 +45,8 @@ export async function* searchTextDocument(
             return;
         }
         const text = doc.lineAt(line).text;
-        for (const tag of query.tags) {
+        for (let tagIndex = 0; tagIndex < query.tags.length; tagIndex++) {
+            const tag = query.tags[tagIndex];
             if (tag.pattern === undefined) {
                 continue;
             }
@@ -53,26 +54,19 @@ export async function* searchTextDocument(
                 if (tag.isRegexMultiLine) {
                     throw new Error("isRegexMultiLine not implemented");
                 }
-                const regex = new RegExp(tag.pattern, "dg");
+                const regex = new RegExp(tag.pattern, "g");
                 for (const match of text.matchAll(regex)) {
-                    if (match.indices === undefined) {
-                        yield {
-                            uri: file,
-                            range: new vscode.Range(line, 0, line, text.length),
-                            label: match[0],
-                        };
-                    } else {
-                        yield {
-                            uri: file,
-                            range: new vscode.Range(
-                                line,
-                                match.indices[0][0],
-                                line,
-                                match.indices[0][1]
-                            ),
-                            label: match[0],
-                        };
-                    }
+                    yield {
+                        uri: file,
+                        range: new vscode.Range(
+                            line,
+                            match.index,
+                            line,
+                            match.index + match[0].length
+                        ),
+                        match,
+                        tagIndex,
+                    };
                 }
             } else {
                 const length = tag.pattern.length;
@@ -81,7 +75,8 @@ export async function* searchTextDocument(
                     yield {
                         uri: file,
                         range: new vscode.Range(line, start, line, start + length),
-                        label: tag.pattern,
+                        match: makeMatch(tag.pattern, start, text),
+                        tagIndex,
                     };
                     start = text.indexOf(tag.pattern, start + 1);
                 }

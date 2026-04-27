@@ -2,7 +2,7 @@ import * as child_process from "node:child_process";
 import { Readable } from "node:stream";
 import { rgPath } from "@vscode/ripgrep";
 import * as vscode from "vscode";
-import type { SearchProvider, SearchQuery, TagMatch } from ".";
+import { makeMatch, type SearchProvider, type SearchQuery, type TagMatch } from ".";
 
 export class RipgrepProvider implements SearchProvider {
     supports(uri: vscode.Uri): boolean {
@@ -49,12 +49,37 @@ export class RipgrepProvider implements SearchProvider {
                         ];
                     })
                 );
-                for (const [start, end] of ranges) {
-                    yield {
-                        uri,
-                        range: new vscode.Range(lineNumber, start, lineNumber, end),
-                        label: lineText.slice(start, end),
-                    };
+                outer: for (const [start, end] of ranges) {
+                    const sliceText = lineText.slice(start, end);
+                    for (let tagIndex = 0; tagIndex < query.tags.length; tagIndex++) {
+                        const tag = query.tags[tagIndex];
+                        if (tag.pattern === undefined) {
+                            continue;
+                        }
+                        if (tag.isRegex) {
+                            const regex = new RegExp(tag.pattern);
+                            const match = regex.exec(sliceText);
+                            if (match !== null) {
+                                match.index = start;
+                                yield {
+                                    uri,
+                                    range: new vscode.Range(lineNumber, start, lineNumber, end),
+                                    match,
+                                    tagIndex,
+                                };
+                                continue outer;
+                            }
+                        } else if (sliceText === tag.pattern) {
+                            yield {
+                                uri,
+                                range: new vscode.Range(lineNumber, start, lineNumber, end),
+                                match: makeMatch(tag.pattern, start, lineText),
+                                tagIndex,
+                            };
+                            continue outer;
+                        }
+                    }
+                    console.warn("Match returned from ripgrep that did not match any tags");
                 }
             }
         }

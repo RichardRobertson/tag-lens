@@ -6,7 +6,8 @@ import { RipgrepProvider } from "./ripgrep";
 export interface TagMatch {
     uri: vscode.Uri;
     range: vscode.Range;
-    label: string;
+    match: RegExpExecArray;
+    tagIndex: number;
 }
 
 export interface SearchQuery {
@@ -111,4 +112,11 @@ export async function* search(
     if (!token.isCancellationRequested && configuration.search.getWorkspace()) {
         yield* searchWorkspace(query, token);
     }
+}
+
+export function makeMatch(match: string, index: number, input: string): RegExpExecArray {
+    const arr = [match] as RegExpExecArray;
+    arr.index = index;
+    arr.input = input;
+    return arr;
 }
