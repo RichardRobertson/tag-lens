@@ -87,7 +87,10 @@ async function* searchExternalEditors(
     token: vscode.CancellationToken
 ): AsyncIterable<TagMatch> {
     for (const document of vscode.workspace.textDocuments) {
-        if (vscode.workspace.getWorkspaceFolder(document.uri) === undefined) {
+        if (
+            !document.isUntitled &&
+            vscode.workspace.getWorkspaceFolder(document.uri) === undefined
+        ) {
             for await (const tagMatch of searchTextDocument(query, document.uri, document, token)) {
                 yield tagMatch;
             }
