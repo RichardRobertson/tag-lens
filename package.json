@@ -245,7 +245,6 @@
         "vscode-manifest-types": "github:RichardRobertson/vscode-manifest-types#v0.3.0"
     },
     "dependencies": {
-        "@vscode/ripgrep": "^1.17.1",
-        "ts-debounce": "^5.0.0"
+        "@vscode/ripgrep": "^1.17.1"
     }
 }

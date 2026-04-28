@@ -1,7 +1,6 @@
 import * as commands from "@generated/commands";
 import * as configuration from "@generated/configuration";
 import * as views from "@generated/views";
-import { debounce } from "ts-debounce";
 import * as vscode from "vscode";
 import { search } from "./searchProvider";
 import { TreeProvider } from "./treeProvider";
@@ -63,9 +62,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
     context.subscriptions.push(
         vscode.commands.registerCommand(commands.rescanWorkspace, scan),
-        vscode.workspace.onDidChangeTextDocument(async () => {
-            await scanDebounced();
-        }),
+        vscode.workspace.onDidChangeTextDocument(scanDebounced),
         vscode.commands.registerCommand(
             openTagLinkCommand,
             async (uri: vscode.Uri, range: vscode.Range) => {
@@ -94,17 +91,37 @@ export function activate(context: vscode.ExtensionContext): void {
         ),
         vscode.workspace.onDidChangeConfiguration(async (e) => {
             if (e.affectsConfiguration(configuration.section)) {
-                await scanDebounced();
+                scanDebounced();
             }
         }),
         treeView
     );
 
-    scanDebounced().then(undefined, (err) => {
-        if (err !== undefined) {
-            vscode.window.showErrorMessage(err.toString());
-        }
-    });
+    scanDebounced();
 }
 
 export function deactivate(): void {}
+
+function debounce(fn: () => Promise<void>, delay: number): Debounced {
+    let timer: NodeJS.Timeout | undefined;
+
+    const debounced = (): void => {
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+            fn().catch((err) =>
+                vscode.window.showErrorMessage(`Caught error from debounced function: ${err}`)
+            );
+        }, delay);
+    };
+
+    debounced.cancel = (): void => {
+        clearTimeout(timer);
+    };
+
+    return debounced;
+}
+
+interface Debounced {
+    (): void;
+    cancel(): void;
+}
