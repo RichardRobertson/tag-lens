@@ -8,6 +8,48 @@ import { TreeProvider } from "./treeProvider";
 export const openTagLinkCommand = "tag-lens.openTagLink";
 
 export function activate(context: vscode.ExtensionContext): void {
+    const styles = new Map<string, vscode.TextEditorDecorationType>();
+
+    function buildStyles(): void {
+        for (const style of styles.values()) {
+            style.dispose();
+        }
+        styles.clear();
+        for (const [name, style] of Object.entries(configuration.getStyles())) {
+            const decoration: vscode.DecorationRenderOptions = {};
+            if (style.backgroundColor !== undefined) {
+                if (typeof style.backgroundColor === "string") {
+                    decoration.backgroundColor = style.backgroundColor;
+                } else if (style.backgroundColor.theme !== undefined) {
+                    decoration.backgroundColor = new vscode.ThemeColor(style.backgroundColor.theme);
+                }
+            }
+            if (style.bold) {
+                decoration.fontWeight = "bold";
+            }
+            if (style.border !== undefined) {
+                decoration.border = style.border;
+            }
+            if (style.foregroundColor !== undefined) {
+                if (typeof style.foregroundColor === "string") {
+                    decoration.color = style.foregroundColor;
+                } else if (style.foregroundColor.theme !== undefined) {
+                    decoration.color = new vscode.ThemeColor(style.foregroundColor.theme);
+                }
+            }
+            if (style.italic) {
+                decoration.fontStyle = "italic";
+            }
+            if (style.opacity !== undefined && Number.isFinite(style.opacity)) {
+                decoration.opacity = Math.min(1.0, Math.max(style.opacity, 0.0)).toString(10);
+            }
+            if (style.textDecoration !== undefined) {
+                decoration.textDecoration = style.textDecoration;
+            }
+            styles.set(name, vscode.window.createTextEditorDecorationType(decoration));
+        }
+    }
+
     const diagnostics = vscode.languages.createDiagnosticCollection("tag-lens");
 
     const treeProvider = new TreeProvider(diagnostics);
@@ -90,7 +132,9 @@ export function activate(context: vscode.ExtensionContext): void {
             }
         ),
         vscode.workspace.onDidChangeConfiguration(async (e) => {
-            if (e.affectsConfiguration(configuration.section)) {
+            if (e.affectsConfiguration(configuration.stylesFullKey)) {
+                buildStyles();
+            } else if (e.affectsConfiguration(configuration.section)) {
                 scanDebounced();
             }
         }),
