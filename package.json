@@ -141,27 +141,9 @@
                                 "type": "boolean",
                                 "markdownDescription": "%tag-lens.configuration.styles[*].italic.markdownDescription%"
                             },
-                            "underline": {
+                            "textDecoration": {
                                 "type": "string",
-                                "markdownDescription": "%tag-lens.configuration.styles[*].underline.markdownDescription%",
-                                "enum": [
-                                    "none",
-                                    "single",
-                                    "double",
-                                    "dotted",
-                                    "wavy"
-                                ],
-                                "markdownEnumDescriptions": [
-                                    "%tag-lens.configuration.styles[*].underline.none.markdownDescription%",
-                                    "%tag-lens.configuration.styles[*].underline.single.markdownDescription%",
-                                    "%tag-lens.configuration.styles[*].underline.double.markdownDescription%",
-                                    "%tag-lens.configuration.styles[*].underline.dotted.markdownDescription%",
-                                    "%tag-lens.configuration.styles[*].underline.wavy.markdownDescription%"
-                                ]
-                            },
-                            "strikethrough": {
-                                "type": "boolean",
-                                "markdownDescription": "%tag-lens.configuration.styles[*].strikethrough.markdownDescription%"
+                                "markdownDescription": "%tag-lens.configuration.styles[*].textDecoration.markdownDescription%"
                             },
                             "opacity": {
                                 "type": "number",
