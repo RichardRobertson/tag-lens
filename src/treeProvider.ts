@@ -4,6 +4,7 @@ import * as configuration from "@generated/configuration";
 import * as vscode from "vscode";
 import { openTagLinkCommand } from "./extension";
 import type { TagMatch } from "./searchProvider";
+import { resolveTemplate } from "./util";
 
 export class TreeProvider implements vscode.TreeDataProvider<UriNode> {
     private rootNodes: WorkspaceNode[] = [];
@@ -108,10 +109,14 @@ export class TreeProvider implements vscode.TreeDataProvider<UriNode> {
                 diagnosticSeverity = vscode.DiagnosticSeverity.Hint;
         }
         if (diagnosticSeverity !== undefined) {
+            const uriDiagnostics = this.diagnostics.get(tagMatch.uri) ?? [];
             this.diagnostics.set(tagMatch.uri, [
+                ...uriDiagnostics,
                 new vscode.Diagnostic(
                     tagMatch.range,
-                    tag.diagnosticMessage ?? tagMatch.match[0],
+                    tag.diagnosticMessage !== undefined
+                        ? resolveTemplate(tag.diagnosticMessage, tagMatch.match)
+                        : tagMatch.match[0],
                     diagnosticSeverity
                 ),
             ]);
