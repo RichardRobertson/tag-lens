@@ -11,6 +11,7 @@ export class TreeProvider implements vscode.TreeDataProvider<UriNode> {
     private untitledNode = WorkspaceNode.newUntitled();
     private externalNode = WorkspaceNode.newExternal();
     private treeInProgress = false;
+    private diagnosticsBuilder: Record<string, vscode.Diagnostic[]> = {};
 
     private readonly emitOnDidChangeTreeData: vscode.EventEmitter<void> = new vscode.EventEmitter();
 
@@ -50,6 +51,7 @@ export class TreeProvider implements vscode.TreeDataProvider<UriNode> {
 
     private beginNewTree(): void {
         this.diagnostics.clear();
+        this.diagnosticsBuilder = {};
         this.rootNodes = [];
         this.untitledNode.clear();
         this.externalNode.clear();
@@ -109,17 +111,19 @@ export class TreeProvider implements vscode.TreeDataProvider<UriNode> {
                 diagnosticSeverity = vscode.DiagnosticSeverity.Hint;
         }
         if (diagnosticSeverity !== undefined) {
-            const uriDiagnostics = this.diagnostics.get(tagMatch.uri) ?? [];
-            this.diagnostics.set(tagMatch.uri, [
-                ...uriDiagnostics,
+            const uriString = tagMatch.uri.toString(true);
+            if (this.diagnosticsBuilder[uriString]) {
+                this.diagnosticsBuilder[uriString] = [];
+            }
+            this.diagnosticsBuilder[uriString].push(
                 new vscode.Diagnostic(
                     tagMatch.range,
                     tag.diagnosticMessage !== undefined
                         ? resolveTemplate(tag.diagnosticMessage, tagMatch.match)
                         : tagMatch.match[0],
                     diagnosticSeverity
-                ),
-            ]);
+                )
+            );
         }
     }
 
@@ -156,6 +160,12 @@ export class TreeProvider implements vscode.TreeDataProvider<UriNode> {
             }
             this.rootNodes = compactedRootNodes;
         }
+        this.diagnostics.set(
+            Object.entries(this.diagnosticsBuilder).map(([uriString, diagnostics]) => [
+                vscode.Uri.parse(uriString),
+                diagnostics,
+            ])
+        );
         this.emitOnDidChangeTreeData.fire();
     }
 
