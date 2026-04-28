@@ -98,14 +98,40 @@
                         "type": "object",
                         "properties": {
                             "foregroundColor": {
-                                "type": "string",
-                                "markdownDescription": "%tag-lens.configuration.styles[*].foregroundColor.markdownDescription%",
-                                "format": "color-hex"
+                                "oneOf": [
+                                    {
+                                        "type": "string",
+                                        "markdownDescription": "%tag-lens.configuration.styles[*].foregroundColor.markdownDescription%"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "markdownDescription": "%tag-lens.configuration.styles[*].foregroundColor.markdownDescription2%",
+                                        "properties": {
+                                            "theme": {
+                                                "type": "string",
+                                                "markdownDescription": "%tag-lens.configuration.styles[*].foregroundColor.theme.markdownDescription%"
+                                            }
+                                        }
+                                    }
+                                ]
                             },
                             "backgroundColor": {
-                                "type": "string",
-                                "markdownDescription": "%tag-lens.configuration.styles[*].backgroundColor.markdownDescription%",
-                                "format": "color-hex"
+                                "oneOf": [
+                                    {
+                                        "type": "string",
+                                        "markdownDescription": "%tag-lens.configuration.styles[*].backgroundColor.markdownDescription%"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "markdownDescription": "%tag-lens.configuration.styles[*].backgroundColor.markdownDescription2%",
+                                        "properties": {
+                                            "theme": {
+                                                "type": "string",
+                                                "markdownDescription": "%tag-lens.configuration.styles[*].backgroundColor.theme.markdownDescription%"
+                                            }
+                                        }
+                                    }
+                                ]
                             },
                             "bold": {
                                 "type": "boolean",
