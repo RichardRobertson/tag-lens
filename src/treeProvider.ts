@@ -13,6 +13,8 @@ export class TreeProvider implements vscode.TreeDataProvider<UriNode> {
 
     private readonly emitOnDidChangeTreeData: vscode.EventEmitter<void> = new vscode.EventEmitter();
 
+    constructor(private readonly diagnostics: vscode.DiagnosticCollection) {}
+
     onDidChangeTreeData: vscode.Event<void> = this.emitOnDidChangeTreeData.event;
 
     getTreeItem(element: UriNode): UriNode {
@@ -46,6 +48,7 @@ export class TreeProvider implements vscode.TreeDataProvider<UriNode> {
     }
 
     private beginNewTree(): void {
+        this.diagnostics.clear();
         this.rootNodes = [];
         this.untitledNode.clear();
         this.externalNode.clear();
@@ -56,7 +59,7 @@ export class TreeProvider implements vscode.TreeDataProvider<UriNode> {
         }
     }
 
-    private addTagMatch(tagMatch: TagMatch): void {
+    private addTagMatch(tagMatch: TagMatch, tags: configuration.Tags): void {
         const workspaceFolder = vscode.workspace
             .getWorkspaceFolder(tagMatch.uri)
             ?.uri.toString(true);
@@ -89,6 +92,30 @@ export class TreeProvider implements vscode.TreeDataProvider<UriNode> {
         file.addChild(
             new TagNode(tagMatch.uri, tagMatch.range, tagMatch.match[0], tagMatch.tagIndex)
         );
+        const tag = tags[tagMatch.tagIndex];
+        let diagnosticSeverity: vscode.DiagnosticSeverity | undefined;
+        switch (tag?.diagnosticSeverity) {
+            case "error":
+                diagnosticSeverity = vscode.DiagnosticSeverity.Error;
+                break;
+            case "warning":
+                diagnosticSeverity = vscode.DiagnosticSeverity.Warning;
+                break;
+            case "information":
+                diagnosticSeverity = vscode.DiagnosticSeverity.Information;
+                break;
+            case "hint":
+                diagnosticSeverity = vscode.DiagnosticSeverity.Hint;
+        }
+        if (diagnosticSeverity !== undefined) {
+            this.diagnostics.set(tagMatch.uri, [
+                new vscode.Diagnostic(
+                    tagMatch.range,
+                    tag.diagnosticMessage ?? tagMatch.match[0],
+                    diagnosticSeverity
+                ),
+            ]);
+        }
     }
 
     private endNewTree(): void {

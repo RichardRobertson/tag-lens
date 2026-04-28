@@ -8,7 +8,9 @@ import { TreeProvider } from "./treeProvider";
 export const openTagLinkCommand = "tag-lens.openTagLink";
 
 export function activate(context: vscode.ExtensionContext): void {
-    const treeProvider = new TreeProvider();
+    const diagnostics = vscode.languages.createDiagnosticCollection("tag-lens");
+
+    const treeProvider = new TreeProvider(diagnostics);
 
     const treeView = vscode.window.createTreeView(views.treeView, {
         treeDataProvider: treeProvider,
@@ -41,12 +43,10 @@ export function activate(context: vscode.ExtensionContext): void {
                         tooltip: vscode.l10n.t("Scanning workspace"),
                         value: 1,
                     };
+                    const tags = configuration.getTags();
                     await treeProvider.withNewTree(async (addTagMatch) => {
-                        for await (const tagMatch of search(
-                            { tags: configuration.getTags() },
-                            stackedTokenSource.token
-                        )) {
-                            addTagMatch(tagMatch);
+                        for await (const tagMatch of search({ tags }, stackedTokenSource.token)) {
+                            addTagMatch(tagMatch, tags);
                         }
                     });
                     treeView.badge = undefined;
