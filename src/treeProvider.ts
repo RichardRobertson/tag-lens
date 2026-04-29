@@ -10,12 +10,17 @@ export class TreeProvider implements vscode.TreeDataProvider<UriNode> {
     private rootNodes: WorkspaceNode[] = [];
     private untitledNode = WorkspaceNode.newUntitled();
     private externalNode = WorkspaceNode.newExternal();
-    private treeInProgress = false;
-    private diagnosticsBuilder = new Map<string, vscode.Diagnostic[]>();
+    private _treeInProgress = false;
+    private readonly diagnosticsBuilder = new Map<string, vscode.Diagnostic[]>();
+    private readonly fileMap = new Map<string, FileNode>();
 
     private readonly emitOnDidChangeTreeData: vscode.EventEmitter<void> = new vscode.EventEmitter();
 
     constructor(private readonly diagnostics: vscode.DiagnosticCollection) {}
+
+    get treeInProgress(): boolean {
+        return this._treeInProgress;
+    }
 
     onDidChangeTreeData: vscode.Event<void> = this.emitOnDidChangeTreeData.event;
 
@@ -36,23 +41,24 @@ export class TreeProvider implements vscode.TreeDataProvider<UriNode> {
     async withNewTree(
         fn: (addTagMatch: typeof this.addTagMatch) => void | Promise<void>
     ): Promise<void> {
-        if (this.treeInProgress) {
+        if (this._treeInProgress) {
             throw new Error("tree in progress");
         }
-        this.treeInProgress = true;
+        this._treeInProgress = true;
         this.beginNewTree();
         try {
             await fn(this.addTagMatch.bind(this));
         } finally {
             this.endNewTree();
-            this.treeInProgress = false;
+            this._treeInProgress = false;
         }
     }
 
     private beginNewTree(): void {
         this.diagnostics.clear();
-        this.diagnosticsBuilder = new Map<string, vscode.Diagnostic[]>();
+        this.diagnosticsBuilder.clear();
         this.rootNodes = [];
+        this.fileMap.clear();
         this.untitledNode.clear();
         this.externalNode.clear();
         for (const workspaceFolder of vscode.workspace.workspaceFolders ?? []) {
@@ -92,6 +98,7 @@ export class TreeProvider implements vscode.TreeDataProvider<UriNode> {
             }
         }
         assert(file);
+        this.fileMap.set(file.resourceUri.toString(true), file);
         file.addChild(
             new TagNode(tagMatch.uri, tagMatch.range, tagMatch.match[0], tagMatch.tagIndex)
         );
@@ -167,6 +174,10 @@ export class TreeProvider implements vscode.TreeDataProvider<UriNode> {
 
     printChildren(): void {
         console.dir(this.rootNodes);
+    }
+
+    getFile(uri: vscode.Uri): FileNode | undefined {
+        return this.fileMap.get(uri.toString(true));
     }
 }
 
@@ -346,7 +357,7 @@ class WorkspaceNode extends FolderNode {
     }
 }
 
-class FileNode extends ContainerNode<TagNode> {
+export class FileNode extends ContainerNode<TagNode> {
     constructor(resourceUri: vscode.Uri) {
         super(resourceUri, resourceUri.toString(), vscode.ThemeIcon.File);
         this.command = {
@@ -357,10 +368,10 @@ class FileNode extends ContainerNode<TagNode> {
     }
 }
 
-class TagNode extends UriNode {
+export class TagNode extends UriNode {
     constructor(
         resourceUri: vscode.Uri,
-        range: vscode.Range,
+        readonly range: vscode.Range,
         label: string,
         readonly tagIndex: number
     ) {
