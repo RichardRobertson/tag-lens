@@ -75,7 +75,7 @@ async function* searchUntitledEditors(
     token: vscode.CancellationToken
 ): AsyncIterable<TagMatch> {
     for (const document of vscode.workspace.textDocuments) {
-        if (document.isUntitled || document.isDirty) {
+        if (document.isUntitled) {
             for await (const tagMatch of searchTextDocument(query, document.uri, document, token)) {
                 yield tagMatch;
             }
