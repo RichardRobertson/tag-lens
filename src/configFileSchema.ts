@@ -112,7 +112,7 @@ export type Comment = z.infer<typeof CommentSchema>;
 export const ConfigFileSchema = z
     .object({
         tagGroups: z.record(z.string(), ExtendsTagsSchema),
-        tags: ExtendsTagsSchema,
+        tags: z.record(z.string(), ExtendsTagsSchema),
         commentTokens: z.record(z.string(), CommentSchema),
         commentTags: ExtendsTagsSchema,
         styles: z.record(z.string(), StyleSchema),
