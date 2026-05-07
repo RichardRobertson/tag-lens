@@ -2,6 +2,7 @@ import * as child_process from "node:child_process";
 import { Readable } from "node:stream";
 import { rgPath } from "@vscode/ripgrep";
 import * as vscode from "vscode";
+import { escapeRegExp } from "../util";
 import { makeMatch, type SearchProvider, type SearchQuery, type TagMatch } from ".";
 
 export class RipgrepProvider implements SearchProvider {
@@ -166,10 +167,6 @@ async function* streamLines(stream: Readable): AsyncIterable<string> {
         }
         yield buffer;
     }
-}
-
-function escapeRegExp(str: string): string {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 interface RipgrepMatch {

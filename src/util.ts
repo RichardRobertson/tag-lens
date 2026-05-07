@@ -21,3 +21,7 @@ export function resolveTemplate(template: string, match: RegExpExecArray): strin
         return token;
     });
 }
+
+export function escapeRegExp(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
