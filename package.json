@@ -21,6 +21,7 @@
     "categories": [
         "Other"
     ],
+    "license": "MIT",
     "activationEvents": [],
     "main": "./dist/extension.js",
     "l10n": "./l10n",
@@ -29,7 +30,19 @@
             {
                 "command": "tag-lens.rescanWorkspace",
                 "title": "%tag-lens.commands.rescanWorkspace.title%",
-                "icon": "$(search)"
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "tag-lens.openGlobalConfig",
+                "title": "%tag-lens.commands.openGlobalConfig.title%"
+            },
+            {
+                "command": "tag-lens.openWorkspaceConfig",
+                "title": "%tag-lens.commands.openWorkspaceConfig.title%"
+            },
+            {
+                "command": "tag-lens.scanLanguageComments",
+                "title": "%tag-lens.commands.scanLanguageComments.title%"
             }
         ],
         "configuration": {
@@ -39,123 +52,15 @@
                     "order": 0,
                     "title": "%tag-lens.configuration.tags.title%",
                     "markdownDescription": "%tag-lens.configuration.tags.markdownDescription%",
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "pattern": {
-                                "type": "string",
-                                "markdownDescription": "%tag-lens.configuration.tags[*].pattern.markdownDescription%"
-                            },
-                            "isRegex": {
-                                "type": "boolean",
-                                "markdownDescription": "%tag-lens.configuration.tags[*].isRegex.markdownDescription%"
-                            },
-                            "isRegexMultiLine": {
-                                "type": "boolean",
-                                "markdownDescription": "%tag-lens.configuration.tags[*].isRegexMultiLine.markdownDescription%"
-                            },
-                            "decorationStyle": {
-                                "type": "string",
-                                "markdownDescription": "%tag-lens.configuration.tags[*].decorationStyle.markdownDescription%"
-                            },
-                            "decorateCaptureGroup": {
-                                "type": "string",
-                                "markdownDescription": "%tag-lens.configuration.tags[*].decorate.markdownDescription%"
-                            },
-                            "diagnosticSeverity": {
-                                "type": "string",
-                                "markdownDescription": "%tag-lens.configuration.tags[*].diagnosticSeverity.markdownDescription%",
-                                "enum": [
-                                    "none",
-                                    "error",
-                                    "warning",
-                                    "information",
-                                    "hint"
-                                ],
-                                "markdownEnumDescriptions": [
-                                    "%tag-lens.configuration.tags[*].diagnosticSeverity.none.markdownDescription%",
-                                    "%tag-lens.configuration.tags[*].diagnosticSeverity.error.markdownDescription%",
-                                    "%tag-lens.configuration.tags[*].diagnosticSeverity.warning.markdownDescription%",
-                                    "%tag-lens.configuration.tags[*].diagnosticSeverity.information.markdownDescription%",
-                                    "%tag-lens.configuration.tags[*].diagnosticSeverity.hint.markdownDescription%"
-                                ]
-                            },
-                            "diagnosticMessage": {
-                                "type": "string",
-                                "markdownDescription": "%tag-lens.configuration.tags[*].diagnosticMessage.markdownDescription%"
-                            }
-                        }
-                    },
-                    "default": []
+                    "type": "null",
+                    "default": null
                 },
                 "tag-lens.styles": {
                     "order": 1,
                     "title": "%tag-lens.configuration.styles.title%",
                     "markdownDescription": "%tag-lens.configuration.styles.markdownDescription%",
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "object",
-                        "properties": {
-                            "foregroundColor": {
-                                "oneOf": [
-                                    {
-                                        "type": "string",
-                                        "markdownDescription": "%tag-lens.configuration.styles[*].foregroundColor.markdownDescription%"
-                                    },
-                                    {
-                                        "type": "object",
-                                        "markdownDescription": "%tag-lens.configuration.styles[*].foregroundColor.markdownDescription2%",
-                                        "properties": {
-                                            "theme": {
-                                                "type": "string",
-                                                "markdownDescription": "%tag-lens.configuration.styles[*].foregroundColor.theme.markdownDescription%"
-                                            }
-                                        }
-                                    }
-                                ]
-                            },
-                            "backgroundColor": {
-                                "oneOf": [
-                                    {
-                                        "type": "string",
-                                        "markdownDescription": "%tag-lens.configuration.styles[*].backgroundColor.markdownDescription%"
-                                    },
-                                    {
-                                        "type": "object",
-                                        "markdownDescription": "%tag-lens.configuration.styles[*].backgroundColor.markdownDescription2%",
-                                        "properties": {
-                                            "theme": {
-                                                "type": "string",
-                                                "markdownDescription": "%tag-lens.configuration.styles[*].backgroundColor.theme.markdownDescription%"
-                                            }
-                                        }
-                                    }
-                                ]
-                            },
-                            "bold": {
-                                "type": "boolean",
-                                "markdownDescription": "%tag-lens.configuration.styles[*].bold.markdownDescription%"
-                            },
-                            "italic": {
-                                "type": "boolean",
-                                "markdownDescription": "%tag-lens.configuration.styles[*].italic.markdownDescription%"
-                            },
-                            "textDecoration": {
-                                "type": "string",
-                                "markdownDescription": "%tag-lens.configuration.styles[*].textDecoration.markdownDescription%"
-                            },
-                            "opacity": {
-                                "type": "number",
-                                "markdownDescription": "%tag-lens.configuration.styles[*].opacity.markdownDescription%"
-                            },
-                            "border": {
-                                "type": "string",
-                                "markdownDescription": "%tag-lens.configuration.styles[*].border.markdownDescription%"
-                            }
-                        }
-                    },
-                    "default": {}
+                    "type": "null",
+                    "default": null
                 },
                 "tag-lens.compactFolders": {
                     "order": 2,
@@ -181,15 +86,8 @@
                     "type": "boolean",
                     "default": true
                 },
-                "tag-lens.search.untitled": {
-                    "order": 4,
-                    "title": "%tag-lens.configuration.search.untitled.title%",
-                    "markdownDescription": "%tag-lens.configuration.search.untitled.markdownDescription%",
-                    "type": "boolean",
-                    "default": true
-                },
                 "tag-lens.search.external": {
-                    "order": 5,
+                    "order": 4,
                     "title": "%tag-lens.configuration.search.external.title%",
                     "markdownDescription": "%tag-lens.configuration.search.external.markdownDescription%",
                     "type": "boolean",
@@ -197,6 +95,12 @@
                 }
             }
         },
+        "jsonValidation": [
+            {
+                "fileMatch": "tag-lens.config.jsonc",
+                "url": "./schema/tag-lens.config.json"
+            }
+        ],
         "menus": {
             "view/title": [
                 {
@@ -227,17 +131,18 @@
     },
     "scripts": {
         "vscode:prepublish": "npm run package",
-        "compile": "npm run check-types && npm run lint && node esbuild.js",
+        "compile": "npm run check-types && npm run lint && node esbuild.ts",
         "watch": "npm-run-all -p watch:*",
-        "watch:esbuild": "node esbuild.js --watch",
+        "watch:esbuild": "node esbuild.ts --watch",
         "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
-        "package": "npm run check-types && npm run lint && node esbuild.js --production",
+        "package": "npm run check-types && npm run lint && node esbuild.ts --production",
         "compile-tests": "tsc -p . --outDir out",
         "watch-tests": "tsc -p . -w --outDir out",
         "pretest": "npm run compile-tests && npm run compile && npm run lint",
         "check-types": "tsc --noEmit",
         "lint": "biome check",
         "test": "vscode-test",
+        "buildJsonSchema": "node buildJsonSchema.ts",
         "vscode-manifest-types": "vscode-manifest-types"
     },
     "devDependencies": {
@@ -253,7 +158,6 @@
         "vscode-manifest-types": "github:RichardRobertson/vscode-manifest-types#v0.3.0"
     },
     "dependencies": {
-        "@vscode/ripgrep": "^1.17.1",
         "jsonc-parser": "^3.3.1",
         "zod": "^4.4.3"
     }

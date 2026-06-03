@@ -92,7 +92,6 @@ export type LineComment = z.infer<typeof LineCommentSchema>;
 export const BlockCommentSchema = z.object({
     blockCommentStart: PatternSchema,
     blockCommentEnd: PatternSchema,
-    continuation: PatternSchema.optional(),
 });
 
 export type BlockComment = z.infer<typeof BlockCommentSchema>;

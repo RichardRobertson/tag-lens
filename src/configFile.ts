@@ -36,18 +36,30 @@ export interface TagDiagnostic {
 }
 
 export class Pattern {
-    constructor(readonly regexp: RegExp) {}
+    constructor(
+        readonly regexp: RegExp,
+        readonly source: string,
+        readonly isRegex: boolean
+    ) {}
 
     static fromRegExp(regexp: string, caseInsensitive: boolean, dotAll: boolean): Pattern {
-        return new Pattern(new RegExp(regexp, Pattern.flags(caseInsensitive, dotAll)));
+        return new Pattern(
+            new RegExp(regexp, Pattern.flags(caseInsensitive, dotAll)),
+            regexp,
+            true
+        );
     }
 
     static fromLiteral(literal: string, caseInsensitive: boolean): Pattern {
-        return new Pattern(new RegExp(escapeRegExp(literal), Pattern.flags(caseInsensitive)));
+        return new Pattern(
+            new RegExp(escapeRegExp(literal), Pattern.flags(caseInsensitive)),
+            literal,
+            false
+        );
     }
 
     private static flags(caseInsensitive: boolean, dotAll?: boolean): string {
-        let flags = "";
+        let flags = "dg";
         if (caseInsensitive) {
             flags = "i";
         }
@@ -63,14 +75,6 @@ export class Pattern {
 
     get dotAll(): boolean {
         return this.regexp.dotAll;
-    }
-
-    get source(): string {
-        return this.regexp.source;
-    }
-
-    exec(text: string): RegExpExecArray | null {
-        return this.regexp.exec(text);
     }
 }
 
@@ -150,7 +154,7 @@ function normalizeStyle(configStyle: ConfigStyle): Style {
 
 export interface CommentToken {
     lineCommentStart?: Pattern;
-    blockComment?: { start: Pattern; end: Pattern; continuation?: Pattern };
+    blockComment?: { start: Pattern; end: Pattern };
 }
 
 function normalizeCommentToken(configComment: Comment): CommentToken {
@@ -163,10 +167,6 @@ function normalizeCommentToken(configComment: Comment): CommentToken {
         blockComment = {
             start: normalizePattern(configComment.blockCommentStart),
             end: normalizePattern(configComment.blockCommentEnd),
-            continuation:
-                configComment.continuation !== undefined
-                    ? normalizePattern(configComment.continuation)
-                    : undefined,
         };
     }
     return {
@@ -260,8 +260,12 @@ export class LayeredConfig {
         if (cached !== undefined) {
             return cached;
         }
+        const rawWorkspaceConfig = this.workspaceConfigs.get(uriString);
+        if (rawWorkspaceConfig === undefined) {
+            return this.effectiveGlobalConfig;
+        }
         const workspaceConfig = hydrateConfig(
-            this.workspaceConfigs.get(uriString) ?? defaultConfig(),
+            rawWorkspaceConfig,
             "workspace",
             new Map([["global", this.effectiveGlobalConfig]])
         );
@@ -281,6 +285,20 @@ export class LayeredConfig {
         for (const workspaceKey of this.workspaceConfigs.keys()) {
             yield* this.getEffectiveWorkspaceConfig(workspaceKey).styles;
         }
+    }
+
+    *getTags(): Iterable<Tag> {
+        yield* LayeredConfig.getTagsInner(this.effectiveGlobalConfig);
+        for (const workspaceKey of this.workspaceConfigs.keys()) {
+            yield* LayeredConfig.getTagsInner(this.getEffectiveWorkspaceConfig(workspaceKey));
+        }
+    }
+
+    private static *getTagsInner(hydratedConfig: HydratedConfig): Iterable<Tag> {
+        for (const hydratedTags of hydratedConfig.tags.values()) {
+            yield* hydratedTags.map((hydratedTag) => hydratedTag.tag);
+        }
+        yield* hydratedConfig.commentTags.map((hydratedTag) => hydratedTag.tag);
     }
 
     private static restyleTags(
