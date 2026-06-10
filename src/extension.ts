@@ -5,10 +5,12 @@ import * as JSONC from "jsonc-parser";
 import * as vscode from "vscode";
 import z from "zod";
 import { LayeredConfig, loadConfig } from "./configFile";
-import { debugDumpQueue, doOneWork, enqueueFile } from "./fileScanner";
+import { cancelWhere, debugDumpQueue, doOneWork, enqueueFile, hasPendingWork } from "./fileScanner";
 import { FileNodeWrapper, TreeProvider } from "./treeProvider";
+import { trace } from "./util";
 
 export const openTagLinkCommand = "tag-lens.openTagLink";
+const disabledWorkspaceFolderState = "tag-lens.disabledWorkspaceFolderState";
 
 // biome-ignore lint/nursery/useExplicitType: Zod object types don't exist before the object does. Type must be implied.
 const PackageJsonLanguageContributionSchema = z.looseObject({
@@ -41,6 +43,13 @@ const LanguageConfigurationSchema = z.looseObject({
 type LanguageConfiguration = z.infer<typeof LanguageConfigurationSchema>;
 
 export function activate(context: vscode.ExtensionContext): void {
+    function enqueueFileLocal(uri: vscode.Uri, priority: boolean): void {
+        enqueueFile(uri, priority);
+        if (tickFileScannerTimeout === undefined) {
+            tickFileScannerTimeout = setTimeout(tickFileScanner, 0);
+        }
+    }
+
     const diagnostics = vscode.languages.createDiagnosticCollection("tag-lens");
 
     const treeProvider = new TreeProvider(diagnostics);
@@ -49,37 +58,54 @@ export function activate(context: vscode.ExtensionContext): void {
         const visibleEditorUris = vscode.window.visibleTextEditors.map<[vscode.Uri, string]>(
             (editor) => [editor.document.uri, editor.document.uri.toString(true)]
         );
-        if (configuration.search.getWorkspace()) {
-            for (const workspaceFolder of vscode.workspace.workspaceFolders ?? []) {
-                for (const uri of await vscode.workspace.findFiles(
-                    new vscode.RelativePattern(workspaceFolder, "**/*")
-                )) {
-                    const uriString = uri.toString(true);
-                    enqueueFile(
-                        uri,
-                        visibleEditorUris.some(
-                            ([_, editorUriString]) => editorUriString === uriString
-                        )
-                    );
-                }
+        const disabledWorkspaceFolders = context.workspaceState.get(
+            disabledWorkspaceFolderState,
+            {} as Record<string, boolean>
+        );
+        for (const workspaceFolder of vscode.workspace.workspaceFolders ?? []) {
+            if (disabledWorkspaceFolders[workspaceFolder.uri.toString(true)]) {
+                continue;
+            }
+            for (const uri of await vscode.workspace.findFiles(
+                new vscode.RelativePattern(workspaceFolder, "**/*")
+            )) {
+                const uriString = uri.toString(true);
+                enqueueFileLocal(
+                    uri,
+                    visibleEditorUris.some(([_, editorUriString]) => editorUriString === uriString)
+                );
             }
         }
-        if (configuration.search.getExternal()) {
+        if (configuration.search.getLoose()) {
             for (const [editorUri, _] of visibleEditorUris) {
-                enqueueFile(editorUri, true);
+                enqueueFileLocal(editorUri, true);
             }
         }
         debugDumpQueue();
     }
 
+    let tickFileScannerTimeout: NodeJS.Timeout | undefined;
+
     function tickFileScanner(): void {
         doOneWork(
+            undefined,
             layeredConfig,
-            (uri) => treeProvider.getNode(uri) !== undefined,
+            (uri) => treeProvider.hasNode(uri),
             (uri, document, matches) => {
                 treeProvider.setFileMatches(uri, document, matches);
             }
-        ).catch((err) => vscode.window.showErrorMessage(`Caught error from doOneWork: ${err}`));
+        )
+            .catch((err) => {
+                trace({ id: "doOneWork", err });
+                vscode.window.showErrorMessage(`Caught error from doOneWork: ${err}`);
+            })
+            .finally(() => {
+                if (hasPendingWork()) {
+                    tickFileScannerTimeout = setTimeout(tickFileScanner, 0);
+                } else {
+                    tickFileScannerTimeout = undefined;
+                }
+            });
     }
 
     const lastPickedWorkspaceFolderState = "tag-lens.lastPickedWorkspaceFolder";
@@ -116,7 +142,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
     const reloadConfigDebounced = debounce(reloadConfig, 100);
 
-    reloadConfigDebounced();
+    reloadConfigDebounced("activate");
 
     const globalConfigWatcher = vscode.workspace.createFileSystemWatcher(
         new vscode.RelativePattern(context.globalStorageUri, "tag-lens.config.jsonc")
@@ -125,12 +151,18 @@ export function activate(context: vscode.ExtensionContext): void {
         "**/.vscode/tag-lens.config.jsonc"
     );
 
-    globalConfigWatcher.onDidChange(reloadConfigDebounced);
-    globalConfigWatcher.onDidCreate(reloadConfigDebounced);
-    globalConfigWatcher.onDidDelete(reloadConfigDebounced);
-    workspaceConfigWatcher.onDidChange(reloadConfigDebounced);
-    workspaceConfigWatcher.onDidCreate(reloadConfigDebounced);
-    workspaceConfigWatcher.onDidDelete(reloadConfigDebounced);
+    globalConfigWatcher.onDidChange(() => reloadConfigDebounced("globalConfigWatcher.onDidChange"));
+    globalConfigWatcher.onDidCreate(() => reloadConfigDebounced("globalConfigWatcher.onDidCreate"));
+    globalConfigWatcher.onDidDelete(() => reloadConfigDebounced("globalConfigWatcher.onDidDelete"));
+    workspaceConfigWatcher.onDidChange(() =>
+        reloadConfigDebounced("workspaceConfigWatcher.onDidChange")
+    );
+    workspaceConfigWatcher.onDidCreate(() =>
+        reloadConfigDebounced("workspaceConfigWatcher.onDidCreate")
+    );
+    workspaceConfigWatcher.onDidDelete(() =>
+        reloadConfigDebounced("workspaceConfigWatcher.onDidDelete")
+    );
 
     const styles = new Map<string, vscode.TextEditorDecorationType>();
 
@@ -202,69 +234,6 @@ export function activate(context: vscode.ExtensionContext): void {
         treeDataProvider: treeProvider,
     });
 
-    // let scanCancellationTokenSource: vscode.CancellationTokenSource | undefined;
-
-    // async function scan(): Promise<void> {
-    //     if (scanCancellationTokenSource !== undefined) {
-    //         scanCancellationTokenSource.cancel();
-    //         scanCancellationTokenSource.dispose();
-    //     }
-    //     scanDebounced.cancel();
-    //     try {
-    //         await vscode.window.withProgress(
-    //             {
-    //                 location: { viewId: views.treeView },
-    //                 cancellable: true,
-    //                 title: vscode.l10n.t("Scanning workspace"),
-    //             },
-    //             async (_progress, token) => {
-    //                 const stackedTokenSource = new vscode.CancellationTokenSource();
-    //                 scanCancellationTokenSource = stackedTokenSource;
-    //                 token.onCancellationRequested(() => {
-    //                     scanDebounced.cancel();
-    //                     stackedTokenSource.cancel();
-    //                     stackedTokenSource.dispose();
-    //                 });
-    //                 treeView.badge = {
-    //                     tooltip: vscode.l10n.t("Scanning workspace"),
-    //                     value: 1,
-    //                 };
-    //                 // const tags = [...layeredConfig.getTags()];
-    //                 // await treeProvider.withNewTree(async (addTagMatch) => {
-    //                 //     for await (const tagMatch of search({ tags }, stackedTokenSource.token)) {
-    //                 //         addTagMatch(tagMatch, tags);
-    //                 //     }
-    //                 // });
-    //                 treeProvider.clearAll();
-    //                 for (const workspaceFolder of vscode.workspace.workspaceFolders ?? []) {
-    //                     // const workspaceConfig = layeredConfig.getEffectiveWorkspaceConfig(
-    //                     //     workspaceFolder.uri
-    //                     // );
-    //                     for (const fileUri of await vscode.workspace.findFiles(
-    //                         new vscode.RelativePattern(workspaceFolder, "**/*"),
-    //                         undefined,
-    //                         undefined,
-    //                         token
-    //                     )) {
-    //                         treeProvider.setFileMatches(
-    //                             fileUri,
-    //                             await vscode.workspace.openTextDocument(fileUri),
-    //                             []
-    //                         );
-    //                     }
-    //                 }
-    //                 // treeProvider.fireOnDidChangeTreeData();
-    //                 treeView.badge = undefined;
-    //             }
-    //         );
-    //     } finally {
-    //         scanCancellationTokenSource?.dispose();
-    //         scanCancellationTokenSource = undefined;
-    //     }
-    // }
-
-    // const scanDebounced = debounce(scan, 1000);
-
     async function openOrCreateConfig(baseUri: vscode.Uri): Promise<void> {
         const configUri = vscode.Uri.joinPath(baseUri, "tag-lens.config.jsonc");
         if (await uriExists(configUri)) {
@@ -286,13 +255,55 @@ export function activate(context: vscode.ExtensionContext): void {
     }
 
     function enqueueIfAllowed(uri: vscode.Uri, priority: boolean = false): void {
-        const isExternal = vscode.workspace.getWorkspaceFolder(uri) === undefined;
-        if (
-            (isExternal && configuration.search.getExternal()) ||
-            (!isExternal && configuration.search.getWorkspace())
-        ) {
-            enqueueFile(uri, priority);
+        const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
+        if (workspaceFolder === undefined && configuration.search.getLoose()) {
+            enqueueFileLocal(uri, priority);
+        } else if (workspaceFolder !== undefined) {
+            const disabledWorkspaceFolders = context.workspaceState.get(
+                disabledWorkspaceFolderState,
+                {} as Record<string, boolean>
+            );
+            if (!disabledWorkspaceFolders[workspaceFolder.uri.toString(true)]) {
+                enqueueFileLocal(uri, priority);
+            }
         }
+    }
+
+    async function pickWorkspaceFolder(): Promise<vscode.WorkspaceFolder | undefined> {
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (workspaceFolders === undefined) {
+            await vscode.window.showWarningMessage(vscode.l10n.t("No workspace open"));
+            return;
+        } else if (workspaceFolders.length === 0) {
+            await vscode.window.showWarningMessage(vscode.l10n.t("No workspace folders available"));
+            return;
+        }
+        const items: (vscode.QuickPickItem & { folder: vscode.WorkspaceFolder })[] =
+            workspaceFolders.map((folder) => ({
+                label: folder.name,
+                description: folder.uri.toString(),
+                folder,
+            }));
+        const lastPicked = context.workspaceState.get<string | undefined>(
+            lastPickedWorkspaceFolderState
+        );
+        items.sort((a, b) => {
+            if (a.folder.uri.toString(true) === lastPicked) {
+                return -1;
+            } else if (b.folder.uri.toString(true) === lastPicked) {
+                return 1;
+            }
+            return 0;
+        });
+        let picked: (vscode.QuickPickItem & { folder: vscode.WorkspaceFolder }) | undefined;
+        if (items.length === 1) {
+            picked = items[0];
+        } else {
+            picked = await vscode.window.showQuickPick(items, {
+                placeHolder: "Select a workspace folder",
+            });
+        }
+        return picked?.folder;
     }
 
     context.subscriptions.push(
@@ -300,14 +311,62 @@ export function activate(context: vscode.ExtensionContext): void {
             treeProvider.clearAll();
             await kickOffScan();
         }),
+        vscode.commands.registerCommand(
+            commands.toggleWorkspace,
+            async (workspaceFolder?: vscode.WorkspaceFolder) => {
+                if (workspaceFolder === undefined) {
+                    const picked = await pickWorkspaceFolder();
+                    if (picked === undefined) {
+                        return;
+                    }
+                    workspaceFolder = picked;
+                }
+                const disabledWorkspaceFolders = context.workspaceState.get(
+                    disabledWorkspaceFolderState,
+                    {} as Record<string, boolean>
+                );
+                const workspaceFolderUriString = workspaceFolder.uri.toString(true);
+                if (disabledWorkspaceFolders[workspaceFolderUriString]) {
+                    delete disabledWorkspaceFolders[workspaceFolderUriString];
+                    const visibleEditorUris = vscode.window.visibleTextEditors.map<
+                        [vscode.Uri, string]
+                    >((editor) => [editor.document.uri, editor.document.uri.toString(true)]);
+                    for (const uri of await vscode.workspace.findFiles(
+                        new vscode.RelativePattern(workspaceFolder, "**/*")
+                    )) {
+                        const uriString = uri.toString(true);
+                        enqueueFileLocal(
+                            uri,
+                            visibleEditorUris.some(
+                                ([_, editorUriString]) => editorUriString === uriString
+                            )
+                        );
+                    }
+                } else {
+                    disabledWorkspaceFolders[workspaceFolderUriString] = true;
+                    cancelWhere(
+                        (uri) =>
+                            vscode.workspace.getWorkspaceFolder(uri)?.uri.toString(true) ===
+                            workspaceFolderUriString
+                    );
+                }
+                await context.workspaceState.update(
+                    disabledWorkspaceFolderState,
+                    disabledWorkspaceFolders
+                );
+                treeProvider.discardWorkspace(workspaceFolder);
+            }
+        ),
         vscode.workspace.onDidChangeTextDocument((e) => {
-            enqueueIfAllowed(e.document.uri);
+            const eUri = e.document.uri;
+            const eUriString = eUri.toString(true);
+            treeProvider.clearFile(eUri);
+            cancelWhere((uri) => uri.toString(true) === eUriString);
+            enqueueIfAllowed(eUri);
         }),
         vscode.workspace.onDidRenameFiles((e) => {
             for (const { oldUri, newUri } of e.files) {
-                // TODO optimize with treeProvider.renameFile(oldUri, newUri);
-                treeProvider.clearFile(oldUri);
-                enqueueIfAllowed(newUri);
+                treeProvider.renameFile(oldUri, newUri);
             }
         }),
         vscode.workspace.onDidDeleteFiles((e) => {
@@ -358,9 +417,19 @@ export function activate(context: vscode.ExtensionContext): void {
             ) {
                 treeProvider.updateShouldCompact();
             }
-            // if (e.affectsConfiguration(configuration.section)) {
-            //     scanDebounced();
-            // }
+            if (e.affectsConfiguration(configuration.search.looseFullKey)) {
+                if (configuration.search.getLoose()) {
+                    for (const editor of vscode.window.visibleTextEditors) {
+                        enqueueFileLocal(editor.document.uri, true);
+                    }
+                } else {
+                    treeProvider.discardLoose();
+                    const workspaceFolderUriStrings = (vscode.workspace.workspaceFolders ?? []).map(
+                        (workspace) => workspace.uri.toString(true)
+                    );
+                    cancelWhere((uri) => !workspaceFolderUriStrings.includes(uri.toString(true)));
+                }
+            }
         }),
         vscode.window.onDidChangeVisibleTextEditors(decorateEditors),
         vscode.commands.registerCommand(commands.openGlobalConfig, async () => {
@@ -368,52 +437,20 @@ export function activate(context: vscode.ExtensionContext): void {
             await openOrCreateConfig(context.globalStorageUri);
         }),
         vscode.commands.registerCommand(commands.openWorkspaceConfig, async () => {
-            const workspaceFolders = vscode.workspace.workspaceFolders;
-            if (workspaceFolders === undefined) {
-                await vscode.window.showWarningMessage(vscode.l10n.t("No workspace open"));
-                return;
-            } else if (workspaceFolders.length === 0) {
-                await vscode.window.showWarningMessage(
-                    vscode.l10n.t("No workspace folders available")
-                );
-                return;
-            }
-            const items: (vscode.QuickPickItem & { folder: vscode.WorkspaceFolder })[] =
-                workspaceFolders.map((folder) => ({
-                    label: folder.name,
-                    description: folder.uri.toString(),
-                    folder,
-                }));
-            const lastPicked = context.workspaceState.get<string | undefined>(
-                lastPickedWorkspaceFolderState
-            );
-            items.sort((a, b) => {
-                if (a.folder.uri.toString(true) === lastPicked) {
-                    return -1;
-                } else if (b.folder.uri.toString(true) === lastPicked) {
-                    return 1;
-                }
-                return 0;
-            });
-            let picked: (vscode.QuickPickItem & { folder: vscode.WorkspaceFolder }) | undefined;
-            if (items.length === 1) {
-                picked = items[0];
-            } else {
-                picked = await vscode.window.showQuickPick(items, {
-                    placeHolder: "Select a workspace folder",
-                });
-            }
+            const picked = await pickWorkspaceFolder();
             if (picked !== undefined) {
                 await context.workspaceState.update(
                     lastPickedWorkspaceFolderState,
-                    picked.folder.uri.toString(true)
+                    picked.uri.toString(true)
                 );
-                const vscodeFolder = vscode.Uri.joinPath(picked.folder.uri, ".vscode");
+                const vscodeFolder = vscode.Uri.joinPath(picked.uri, ".vscode");
                 await vscode.workspace.fs.createDirectory(vscodeFolder);
                 await openOrCreateConfig(vscodeFolder);
             }
         }),
-        vscode.workspace.onDidChangeWorkspaceFolders(reloadConfigDebounced),
+        vscode.workspace.onDidChangeWorkspaceFolders(() =>
+            reloadConfigDebounced("onDidChangeWorkspaceFolders")
+        ),
         vscode.commands.registerCommand(commands.scanLanguageComments, async () => {
             const decoder = new TextDecoder();
             let content =
@@ -508,21 +545,22 @@ export function activate(context: vscode.ExtensionContext): void {
 
     // scanDebounced();
 
-    kickOffScan().catch((err) =>
-        vscode.window.showErrorMessage(`Caught error from \`kickOffScan\`: ${err}`)
-    );
-
-    tickFileScanner();
+    // kickOffScan().catch((err) =>
+    //     vscode.window.showErrorMessage(`Caught error from \`kickOffScan\`: ${err}`)
+    // );
 }
 
 export function deactivate(): void {}
 
 function debounce(fn: () => Promise<void>, delay: number): Debounced {
     let timer: NodeJS.Timeout | undefined;
+    const callers = new Set<string>();
 
-    const debounced = (): void => {
+    const debounced = (caller: string): void => {
         clearTimeout(timer);
+        callers.add(caller);
         timer = setTimeout(() => {
+            trace({ debounced: fn.name, callers });
             fn().catch((err) =>
                 vscode.window.showErrorMessage(`Caught error from debounced function: ${err}`)
             );
@@ -537,7 +575,7 @@ function debounce(fn: () => Promise<void>, delay: number): Debounced {
 }
 
 interface Debounced {
-    (): void;
+    (caller: string): void;
     cancel(): void;
 }
 

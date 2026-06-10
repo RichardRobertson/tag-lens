@@ -43,6 +43,10 @@
             {
                 "command": "tag-lens.scanLanguageComments",
                 "title": "%tag-lens.commands.scanLanguageComments.title%"
+            },
+            {
+                "command": "tag-lens.toggleWorkspace",
+                "title": "%tag-lens.commands.toggleWorkspace.title%"
             }
         ],
         "configuration": {
@@ -79,17 +83,10 @@
                     ],
                     "default": "editor"
                 },
-                "tag-lens.search.workspace": {
+                "tag-lens.search.loose": {
                     "order": 3,
-                    "title": "%tag-lens.configuration.search.workspace.title%",
-                    "markdownDescription": "%tag-lens.configuration.search.workspace.markdownDescription%",
-                    "type": "boolean",
-                    "default": true
-                },
-                "tag-lens.search.external": {
-                    "order": 4,
-                    "title": "%tag-lens.configuration.search.external.title%",
-                    "markdownDescription": "%tag-lens.configuration.search.external.markdownDescription%",
+                    "title": "%tag-lens.configuration.search.loose.title%",
+                    "markdownDescription": "%tag-lens.configuration.search.loose.markdownDescription%",
                     "type": "boolean",
                     "default": true
                 }
@@ -159,6 +156,7 @@
     },
     "dependencies": {
         "jsonc-parser": "^3.3.1",
+        "re2js": "^2.8.3",
         "zod": "^4.4.3"
     }
 }

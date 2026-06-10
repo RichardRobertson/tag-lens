@@ -1,5 +1,6 @@
 import assert from "node:assert";
 import * as JSONC from "jsonc-parser";
+import { RE2JS } from "re2js";
 import * as vscode from "vscode";
 import {
     type Color,
@@ -11,7 +12,6 @@ import {
     type Tag as ConfigTag,
     type ExtendsTags,
 } from "./configFileSchema";
-import { escapeRegExp } from "./util";
 
 export async function loadConfig(uri: vscode.Uri): Promise<Config> {
     const fileBytes = await vscode.workspace.fs.readFile(uri);
@@ -37,14 +37,14 @@ export interface TagDiagnostic {
 
 export class Pattern {
     constructor(
-        readonly regexp: RegExp,
+        readonly regexp: RE2JS,
         readonly source: string,
         readonly isRegex: boolean
     ) {}
 
     static fromRegExp(regexp: string, caseInsensitive: boolean, dotAll: boolean): Pattern {
         return new Pattern(
-            new RegExp(regexp, Pattern.flags(caseInsensitive, dotAll)),
+            RE2JS.compile(regexp, Pattern.flags(caseInsensitive, dotAll)),
             regexp,
             true
         );
@@ -52,29 +52,21 @@ export class Pattern {
 
     static fromLiteral(literal: string, caseInsensitive: boolean): Pattern {
         return new Pattern(
-            new RegExp(escapeRegExp(literal), Pattern.flags(caseInsensitive)),
+            RE2JS.compile(RE2JS.quote(literal), Pattern.flags(caseInsensitive)),
             literal,
             false
         );
     }
 
-    private static flags(caseInsensitive: boolean, dotAll?: boolean): string {
-        let flags = "dg";
+    private static flags(caseInsensitive: boolean, dotAll?: boolean): number {
+        let flags = RE2JS.MULTILINE;
         if (caseInsensitive) {
-            flags = "i";
+            flags |= RE2JS.CASE_INSENSITIVE;
         }
         if (dotAll) {
-            flags += "s";
+            flags += RE2JS.DOTALL;
         }
         return flags;
-    }
-
-    get caseInsensitive(): boolean {
-        return this.regexp.ignoreCase;
-    }
-
-    get dotAll(): boolean {
-        return this.regexp.dotAll;
     }
 }
 

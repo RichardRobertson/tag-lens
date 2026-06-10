@@ -42,7 +42,11 @@ abstract class NodeWrapper<N extends Node> {
 
     protected abstract assertNodeType(node: Node | undefined): asserts node is N;
 
-    abstract deleteNode(): void;
+    abstract deleteNode(
+        visitor?: (
+            node: WorkspaceNodeWrapper | FolderNodeWrapper | FileNodeWrapper | RangeNodeWrapper
+        ) => void
+    ): void;
 
     abstract fullPath(): Generator<
         WorkspaceNodeWrapper | FolderNodeWrapper | FileNodeWrapper | RangeNodeWrapper
@@ -127,9 +131,14 @@ export class WorkspaceNodeWrapper extends NodeWrapper<WorkspaceNode> {
         assert(node?.type === "workspace");
     }
 
-    override deleteNode(): void {
+    override deleteNode(
+        visitor?: (
+            node: WorkspaceNodeWrapper | FolderNodeWrapper | FileNodeWrapper | RangeNodeWrapper
+        ) => void
+    ): void {
+        visitor?.call(undefined, this);
         for (const child of this.children()) {
-            child.deleteNode();
+            child.deleteNode(visitor);
         }
         this.nodeMap.delete(this.uriString);
     }
@@ -199,9 +208,14 @@ export class FolderNodeWrapper extends NodeWrapper<FsNode> {
         assert(node?.type === "folder");
     }
 
-    override deleteNode(): void {
+    override deleteNode(
+        visitor?: (
+            node: WorkspaceNodeWrapper | FolderNodeWrapper | FileNodeWrapper | RangeNodeWrapper
+        ) => void
+    ): void {
+        visitor?.call(undefined, this);
         for (const child of this.children()) {
-            child.deleteNode();
+            child.deleteNode(visitor);
         }
         const parentNode = this.parent().node;
         parentNode.children.splice(parentNode.children.indexOf(this.uriString), 1);
@@ -240,9 +254,14 @@ export class FileNodeWrapper extends NodeWrapper<FsNode> {
         assert(node?.type === "file");
     }
 
-    override deleteNode(): void {
+    override deleteNode(
+        visitor?: (
+            node: WorkspaceNodeWrapper | FolderNodeWrapper | FileNodeWrapper | RangeNodeWrapper
+        ) => void
+    ): void {
+        visitor?.call(undefined, this);
         for (const child of this.children()) {
-            child.deleteNode();
+            child.deleteNode(visitor);
         }
         const parentNode = this.parent().node;
         parentNode.children.splice(parentNode.children.indexOf(this.uriString), 1);
@@ -280,7 +299,12 @@ export class RangeNodeWrapper extends NodeWrapper<RangeNode> {
         assert(node?.type === "range");
     }
 
-    override deleteNode(): void {
+    override deleteNode(
+        visitor?: (
+            node: WorkspaceNodeWrapper | FolderNodeWrapper | FileNodeWrapper | RangeNodeWrapper
+        ) => void
+    ): void {
+        visitor?.call(undefined, this);
         const parentNode = this.parent().node;
         parentNode.children.splice(parentNode.children.indexOf(this.uriString), 1);
         this.nodeMap.delete(this.uriString);
@@ -484,7 +508,34 @@ export class TreeProvider implements vscode.TreeDataProvider<string> {
         }
     }
 
-    setFileMatches(uri: vscode.Uri, document: vscode.TextDocument, matches: TagMatch[]): void {
+    setFileMatches(uri: vscode.Uri, ranges: RangeNode[]): void;
+    setFileMatches(uri: vscode.Uri, document: vscode.TextDocument, matches: TagMatch[]): void;
+    setFileMatches(
+        uri: vscode.Uri,
+        documentOrRanges: vscode.TextDocument | RangeNode[],
+        matches?: TagMatch[]
+    ): void {
+        function addRangeNode(
+            nodeMap: Map<string, Node>,
+            uri: vscode.Uri,
+            range: vscode.Range,
+            label: string,
+            tag: Tag
+        ): void {
+            const rangeString = `L${range.start.line}:${range.start.character}-L${range.end.line}:${range.end.character}`;
+            const resourceUri = uri.with({
+                fragment: rangeString,
+            });
+            const resourceUriString = resourceUri.toString(true);
+            newNode.children.push(resourceUriString);
+            nodeMap.set(resourceUriString, {
+                type: "range",
+                parent: uriString,
+                range,
+                label,
+                tag,
+            });
+        }
         const uriString = uri.toString(true);
         // trace({ id: "treeProvider.setFileMatches", uriString });
         const [parentUriString, parentNode, notifyRootUriString] = this.ensurePath(uri);
@@ -495,71 +546,68 @@ export class TreeProvider implements vscode.TreeDataProvider<string> {
             children: [],
         };
         const diagnostics: vscode.Diagnostic[] = [];
-        for (const { match, tag } of matches) {
-            let range: vscode.Range | undefined;
-            let label: string | undefined;
-            if (tag.decorateCaptureGroup !== undefined) {
-                let indices: [number, number] | undefined;
-                if (typeof tag.decorateCaptureGroup === "number") {
-                    indices = match.indices?.[tag.decorateCaptureGroup];
-                    label = match[tag.decorateCaptureGroup];
-                } else {
-                    indices = match.indices?.groups?.[tag.decorateCaptureGroup.name];
-                    label = match.groups?.[tag.decorateCaptureGroup.name];
+        if ("uri" in documentOrRanges) {
+            const document = documentOrRanges;
+            assert(matches);
+            for (const { match, tag } of matches) {
+                let range: vscode.Range | undefined;
+                let label: string | undefined;
+                if (tag.decorateCaptureGroup !== undefined) {
+                    let indices: [number, number] | undefined;
+                    if (typeof tag.decorateCaptureGroup === "number") {
+                        indices = match.indices?.[tag.decorateCaptureGroup];
+                        label = match[tag.decorateCaptureGroup];
+                    } else {
+                        indices = match.indices?.groups?.[tag.decorateCaptureGroup.name];
+                        label = match.groups?.[tag.decorateCaptureGroup.name];
+                    }
+                    if (indices !== undefined) {
+                        range = new vscode.Range(
+                            document.positionAt(indices[0]),
+                            document.positionAt(indices[1])
+                        );
+                    }
                 }
-                if (indices !== undefined) {
+                if (range === undefined || label === undefined) {
                     range = new vscode.Range(
-                        document.positionAt(indices[0]),
-                        document.positionAt(indices[1])
+                        document.positionAt(match.index),
+                        document.positionAt(match.index + match[0].length)
+                    );
+                    label = match[0];
+                }
+                if (tag.diagnostic !== undefined) {
+                    let severity: vscode.DiagnosticSeverity | undefined;
+                    switch (tag.diagnostic.severity) {
+                        case "error":
+                            severity = vscode.DiagnosticSeverity.Error;
+                            break;
+                        case "warning":
+                            severity = vscode.DiagnosticSeverity.Warning;
+                            break;
+                        case "information":
+                            severity = vscode.DiagnosticSeverity.Information;
+                            break;
+                        case "hint":
+                            severity = vscode.DiagnosticSeverity.Hint;
+                            break;
+                    }
+                    diagnostics.push(
+                        new vscode.Diagnostic(
+                            range,
+                            tag.diagnostic.customMessage === undefined
+                                ? label
+                                : resolveTemplate(tag.diagnostic.customMessage, match),
+                            severity
+                        )
                     );
                 }
+                addRangeNode(this.nodeMap, uri, range, label, tag);
             }
-            if (range === undefined || label === undefined) {
-                range = new vscode.Range(
-                    document.positionAt(match.index),
-                    document.positionAt(match.index + match[0].length)
-                );
-                label = match[0];
+        } else {
+            const ranges = documentOrRanges;
+            for (const { range, label, tag } of ranges) {
+                addRangeNode(this.nodeMap, uri, range, label, tag);
             }
-            if (tag.diagnostic !== undefined) {
-                let severity: vscode.DiagnosticSeverity | undefined;
-                switch (tag.diagnostic.severity) {
-                    case "error":
-                        severity = vscode.DiagnosticSeverity.Error;
-                        break;
-                    case "warning":
-                        severity = vscode.DiagnosticSeverity.Warning;
-                        break;
-                    case "information":
-                        severity = vscode.DiagnosticSeverity.Information;
-                        break;
-                    case "hint":
-                        severity = vscode.DiagnosticSeverity.Hint;
-                        break;
-                }
-                diagnostics.push(
-                    new vscode.Diagnostic(
-                        range,
-                        tag.diagnostic.customMessage === undefined
-                            ? label
-                            : resolveTemplate(tag.diagnostic.customMessage, match),
-                        severity
-                    )
-                );
-            }
-            const rangeString = `L${range.start.line}:${range.start.character}-L${range.end.line}:${range.end.character}`;
-            const resourceUri = uri.with({
-                fragment: rangeString,
-            });
-            const resourceUriString = resourceUri.toString(true);
-            newNode.children.push(resourceUriString);
-            this.nodeMap.set(resourceUriString, {
-                type: "range",
-                parent: uriString,
-                range,
-                label,
-                tag,
-            });
         }
         this.diagnostics.set(uri, diagnostics);
         this.nodeMap.set(uriString, newNode);
@@ -668,8 +716,17 @@ export class TreeProvider implements vscode.TreeDataProvider<string> {
         }
     }
 
+    hasNode(uri: vscode.Uri): boolean;
+    hasNode(uriString: string): boolean;
+    hasNode(uriOrString: vscode.Uri | string): boolean {
+        const uriString =
+            typeof uriOrString === "string" ? uriOrString : uriOrString.toString(true);
+        return this.nodeMap.has(uriString);
+    }
+
     clearAll(): void {
         this.nodeMap.clear();
+        this.diagnostics.clear();
         this.setupWorkspaceFolders();
         this.fireOnDidChangeTreeData(undefined);
     }
@@ -707,6 +764,53 @@ export class TreeProvider implements vscode.TreeDataProvider<string> {
         if (shouldCompact !== previousValue && notify) {
             this.fireOnDidChangeTreeData(undefined);
         }
+    }
+
+    renameFile(from: vscode.Uri, to: vscode.Uri): void {
+        const fileNode = this.getNode(from);
+        if (fileNode === undefined) {
+            return;
+        }
+        assert(fileNode instanceof FileNodeWrapper);
+        assert(!this.nodeMap.has(to.toString(true)));
+        const rangeNodes = [
+            ...fileNode.children().map<RangeNode>((rangeNodeWrapper) => rangeNodeWrapper.node),
+        ];
+        fileNode.deleteNode();
+        const fromDiagnostics = this.diagnostics.get(from);
+        this.diagnostics.set(to, fromDiagnostics);
+        this.diagnostics.set(from, undefined);
+        this.setFileMatches(to, rangeNodes);
+    }
+
+    discardLoose(): void {
+        const looseFilesNode = this.getNode("");
+        assert(looseFilesNode instanceof WorkspaceNodeWrapper);
+        const children = [...looseFilesNode.children()];
+        for (const child of children) {
+            child.deleteNode((node) => {
+                if (node instanceof FileNodeWrapper) {
+                    const nodeUri = vscode.Uri.parse(node.uriString);
+                    this.diagnostics.set(nodeUri, undefined);
+                }
+            });
+        }
+        this.fireOnDidChangeTreeData({ type: "real", uriString: "" });
+    }
+
+    discardWorkspace(workspaceFolder: vscode.WorkspaceFolder): void {
+        const workspaceNode = this.getNode(workspaceFolder.uri);
+        assert(workspaceNode instanceof WorkspaceNodeWrapper);
+        const children = [...workspaceNode.children()];
+        for (const child of children) {
+            child.deleteNode((node) => {
+                if (node instanceof FileNodeWrapper) {
+                    const nodeUri = vscode.Uri.parse(node.uriString);
+                    this.diagnostics.set(nodeUri, undefined);
+                }
+            });
+        }
+        this.fireOnDidChangeTreeData({ type: "real", uriString: workspaceNode.uriString });
     }
 
     fireOnDidChangeTreeData(element?: ProjectedNode): void {
