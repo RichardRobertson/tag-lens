@@ -64,7 +64,7 @@ export class Pattern {
             flags |= RE2JS.CASE_INSENSITIVE;
         }
         if (dotAll) {
-            flags += RE2JS.DOTALL;
+            flags |= RE2JS.DOTALL;
         }
         return flags;
     }
