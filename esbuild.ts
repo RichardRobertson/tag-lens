@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 import esbuild from "esbuild";
 
 const production: boolean = process.argv.includes("--production");
@@ -29,7 +31,7 @@ async function main(): Promise<void> {
         sourcemap: !production,
         sourcesContent: false,
         platform: "node",
-        outfile: "dist/extension.js",
+        outfile: "dist/extension.cjs",
         external: ["vscode"],
         logLevel: "silent",
         plugins: [

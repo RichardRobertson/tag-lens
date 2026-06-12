@@ -23,7 +23,8 @@
     ],
     "license": "MIT",
     "activationEvents": [],
-    "main": "./dist/extension.js",
+    "main": "./dist/extension.cjs",
+    "type": "module",
     "l10n": "./l10n",
     "contributes": {
         "commands": [

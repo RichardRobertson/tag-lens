@@ -1,5 +1,7 @@
 #!/user/bin/env node
 
+/// <reference types="node" />
+
 import * as fs from "node:fs";
 import { z } from "zod";
 import { ConfigFileSchema } from "./src/configFileSchema.ts";
