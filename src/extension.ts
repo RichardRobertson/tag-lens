@@ -5,7 +5,7 @@ import * as JSONC from "jsonc-parser";
 import * as vscode from "vscode";
 import z from "zod";
 import { LayeredConfig, loadConfig } from "./configFile";
-import { cancelWhere, debugDumpQueue, doOneWork, enqueueFile, hasPendingWork } from "./fileScanner";
+import { cancelUri, enqueueFile, fileScannerUpdateConfig, initFileScanner } from "./fileScanner";
 import { FileNodeWrapper, TreeProvider } from "./treeProvider";
 import { trace } from "./util";
 
@@ -45,14 +45,19 @@ type LanguageConfiguration = z.infer<typeof LanguageConfigurationSchema>;
 export function activate(context: vscode.ExtensionContext): void {
     function enqueueFileLocal(uri: vscode.Uri, priority: boolean): void {
         enqueueFile(uri, priority);
-        if (tickFileScannerTimeout === undefined) {
-            tickFileScannerTimeout = setTimeout(tickFileScanner, 0);
-        }
+        // if (tickFileScannerTimeout === undefined) {
+        //     tickFileScannerTimeout = setTimeout(tickFileScanner, 0);
+        // }
     }
 
     const diagnostics = vscode.languages.createDiagnosticCollection("tag-lens");
 
     const treeProvider = new TreeProvider(diagnostics);
+
+    initFileScanner(
+        (uri) => treeProvider.hasNode(uri),
+        (uri, document, matches) => treeProvider.setFileMatches(uri, document, matches)
+    );
 
     async function kickOffScan(): Promise<void> {
         const visibleEditorUris = vscode.window.visibleTextEditors.map<[vscode.Uri, string]>(
@@ -81,32 +86,31 @@ export function activate(context: vscode.ExtensionContext): void {
                 enqueueFileLocal(editorUri, true);
             }
         }
-        debugDumpQueue();
     }
 
-    let tickFileScannerTimeout: NodeJS.Timeout | undefined;
+    // let tickFileScannerTimeout: NodeJS.Timeout | undefined;
 
-    function tickFileScanner(): void {
-        doOneWork(
-            undefined,
-            layeredConfig,
-            (uri) => treeProvider.hasNode(uri),
-            (uri, document, matches) => {
-                treeProvider.setFileMatches(uri, document, matches);
-            }
-        )
-            .catch((err) => {
-                trace({ id: "doOneWork", err });
-                vscode.window.showErrorMessage(`Caught error from doOneWork: ${err}`);
-            })
-            .finally(() => {
-                if (hasPendingWork()) {
-                    tickFileScannerTimeout = setTimeout(tickFileScanner, 0);
-                } else {
-                    tickFileScannerTimeout = undefined;
-                }
-            });
-    }
+    // function tickFileScanner(): void {
+    //     doOneWork(
+    //         undefined,
+    //         layeredConfig,
+    //         (uri) => treeProvider.hasNode(uri),
+    //         (uri, document, matches) => {
+    //             treeProvider.setFileMatches(uri, document, matches);
+    //         }
+    //     )
+    //         .catch((err) => {
+    //             trace({ id: "doOneWork", err });
+    //             vscode.window.showErrorMessage(`Caught error from doOneWork: ${err}`);
+    //         })
+    //         .finally(() => {
+    //             if (hasPendingWork()) {
+    //                 tickFileScannerTimeout = setTimeout(tickFileScanner, 0);
+    //             } else {
+    //                 tickFileScannerTimeout = undefined;
+    //             }
+    //         });
+    // }
 
     const lastPickedWorkspaceFolderState = "tag-lens.lastPickedWorkspaceFolder";
 
@@ -136,6 +140,7 @@ export function activate(context: vscode.ExtensionContext): void {
             })
         );
         treeProvider.clearAll();
+        fileScannerUpdateConfig(layeredConfig);
         buildStyles();
         await kickOffScan();
     }
@@ -344,11 +349,7 @@ export function activate(context: vscode.ExtensionContext): void {
                     }
                 } else {
                     disabledWorkspaceFolders[workspaceFolderUriString] = true;
-                    cancelWhere(
-                        (uri) =>
-                            vscode.workspace.getWorkspaceFolder(uri)?.uri.toString(true) ===
-                            workspaceFolderUriString
-                    );
+                    cancelUri(workspaceFolderUriString);
                 }
                 await context.workspaceState.update(
                     disabledWorkspaceFolderState,
@@ -361,7 +362,7 @@ export function activate(context: vscode.ExtensionContext): void {
             const eUri = e.document.uri;
             const eUriString = eUri.toString(true);
             treeProvider.clearFile(eUri);
-            cancelWhere((uri) => uri.toString(true) === eUriString);
+            cancelUri(eUriString);
             enqueueIfAllowed(eUri);
         }),
         vscode.workspace.onDidRenameFiles((e) => {
@@ -424,10 +425,7 @@ export function activate(context: vscode.ExtensionContext): void {
                     }
                 } else {
                     treeProvider.discardLoose();
-                    const workspaceFolderUriStrings = (vscode.workspace.workspaceFolders ?? []).map(
-                        (workspace) => workspace.uri.toString(true)
-                    );
-                    cancelWhere((uri) => !workspaceFolderUriStrings.includes(uri.toString(true)));
+                    cancelUri(undefined);
                 }
             }
         }),

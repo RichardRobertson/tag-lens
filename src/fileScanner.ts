@@ -1,103 +1,104 @@
+import PQueue from "p-queue";
 import * as vscode from "vscode";
-import type { HydratedConfig, LayeredConfig } from "./configFile";
+import { type HydratedConfig, LayeredConfig } from "./configFile";
 import type { TagMatch } from "./treeProvider";
-import { concatIterables, re2jsMatchAllWithIndices, trace, WorkQueue } from "./util";
+import { concatIterables, re2jsMatchAllWithIndices, trace } from "./util";
 
-const fileQueue: WorkQueue<vscode.Uri, string> = new WorkQueue<vscode.Uri, string>((uri) =>
-    uri.toString(true)
-);
+const fileQueue2: PQueue = new PQueue({ concurrency: 10 });
 
-export function clearQueue(): void {
-    fileQueue.clear();
+let globalAbortController: AbortController = new AbortController();
+
+function createLinkedAbortController(signal: AbortSignal): AbortController {
+    const newController = new AbortController();
+    signal.addEventListener("abort", () => {
+        newController.abort();
+    });
+    return newController;
 }
 
-export function enqueueFile(uri: vscode.Uri, priority: boolean = false): void {
-    fileQueue.enqueue(uri, priority);
-}
+let layeredConfig: LayeredConfig = new LayeredConfig();
 
-export function debugDumpQueue(): void {
-    fileQueue.debugDump();
-}
+const uriAbortMap: Map<string, AbortController> = new Map();
 
-export function hasPendingWork(): boolean {
-    return !fileQueue.isEmpty();
-}
-
-interface Task {
-    cancellationTokenSource: vscode.CancellationTokenSource;
-    promise: Promise<void>;
-    subscription?: vscode.Disposable;
-    uri: vscode.Uri;
-}
-
-let task: Task | undefined;
-
-type Tail2<T extends unknown[]> = T extends [unknown, unknown, ...infer Rest] ? Rest : never;
-
-export function doOneWork(
-    outerToken: vscode.CancellationToken | undefined,
-    ...args: Tail2<Parameters<typeof doOneWorkImpl>>
-): Promise<void> {
-    if (task !== undefined) {
-        throw new Error("Overlapped process");
-    }
-    const cancellationTokenSource = new vscode.CancellationTokenSource();
-    const subscription = outerToken?.onCancellationRequested(() =>
-        cancellationTokenSource.cancel()
-    );
-    const uri = fileQueue.pop();
-    if (uri === undefined) {
-        return Promise.resolve();
-    }
-    task = {
-        cancellationTokenSource,
-        promise: doOneWorkImpl(cancellationTokenSource.token, uri, ...args).finally(() => {
-            cancellationTokenSource.dispose();
-            subscription?.dispose();
-            task = undefined;
-        }),
-        subscription,
-        uri,
-    };
-    return task.promise;
-}
-
-export function cancel(): Promise<void> {
-    if (task === undefined) {
-        throw new Error("No running process");
-    }
-    task.cancellationTokenSource.cancel();
-    return task.promise;
-}
-
-export function wait(): Promise<void> {
-    if (task === undefined) {
-        throw new Error("No running process");
-    }
-    return task.promise;
-}
-
-export function cancelWhere(predicate: (uri: vscode.Uri) => boolean): void {
-    fileQueue.cancelWhere(predicate);
-    if (task !== undefined && predicate(task.uri)) {
-        task.cancellationTokenSource.cancel();
-    }
-}
-
-async function doOneWorkImpl(
-    cancellationToken: vscode.CancellationToken,
+let treeHasFile: (uri: vscode.Uri) => boolean | Thenable<boolean> = () => false;
+let setTreeFileMatches: (
     uri: vscode.Uri,
-    layeredConfig: LayeredConfig,
-    treeHasFile: (uri: vscode.Uri) => boolean | Thenable<boolean>,
-    setTreeFileMatches: (
+    document: vscode.TextDocument,
+    matches: TagMatch[]
+) => void | Thenable<void> = () => {};
+
+export function initFileScanner(
+    treeHasFileFn: (uri: vscode.Uri) => boolean | Thenable<boolean>,
+    setTreeFileMatchesFn: (
         uri: vscode.Uri,
         document: vscode.TextDocument,
         matches: TagMatch[]
     ) => void | Thenable<void>
+): void {
+    treeHasFile = treeHasFileFn;
+    setTreeFileMatches = setTreeFileMatchesFn;
+}
+
+export function fileScannerUpdateConfig(newConfig: LayeredConfig): void {
+    layeredConfig = newConfig;
+    clearQueue();
+}
+
+export function clearQueue(): void {
+    globalAbortController.abort("clearQueue");
+    globalAbortController = new AbortController();
+    uriAbortMap.clear();
+    fileQueue2.clear();
+}
+
+export function enqueueFile(uri: vscode.Uri, priority: boolean = false): void {
+    const uriString = uri.toString(true);
+    if (fileQueue2.sizeBy({ id: uriString }) !== 0) {
+        if (priority) {
+            fileQueue2.setPriority(uriString, 1);
+        }
+        return;
+    }
+    if (fileQueue2.runningTasks.some((value) => value.id === uriString)) {
+        return;
+    }
+    const workspaceUriString = vscode.workspace.getWorkspaceFolder(uri)?.uri.toString(true) ?? "";
+    let workspaceAbortController = uriAbortMap.get(workspaceUriString);
+    if (workspaceAbortController === undefined) {
+        workspaceAbortController = createLinkedAbortController(globalAbortController.signal);
+        uriAbortMap.set(workspaceUriString, workspaceAbortController);
+    }
+    const fileAbortController = createLinkedAbortController(workspaceAbortController.signal);
+    uriAbortMap.set(uriString, fileAbortController);
+    fileQueue2.add(
+        () =>
+            processFile(fileAbortController.signal, uri, layeredConfig).finally(() => {
+                uriAbortMap.delete(uriString);
+            }),
+        {
+            id: uriString,
+            priority: priority ? 1 : 0,
+            signal: fileAbortController.signal,
+        }
+    );
+}
+
+export function cancelUri(uriString: string | undefined): void {
+    if (uriString === undefined) {
+        uriAbortMap.get("")?.abort("cancelWhere(undefined)");
+    } else {
+        uriAbortMap.get(uriString)?.abort(`cancelWhere(${uriString})`);
+    }
+}
+
+async function processFile(
+    abortSignal: AbortSignal,
+    uri: vscode.Uri,
+    layeredConfig: LayeredConfig
 ): Promise<void> {
     const document = await vscode.workspace.openTextDocument(uri);
-    if (cancellationToken.isCancellationRequested) {
-        trace({ id: "doOneWorkImpl:cancellationToken" });
+    if (abortSignal.aborted) {
+        trace({ id: "doOneWorkImpl:abortSignal" });
         return;
     }
     if (await treeHasFile(uri)) {
@@ -197,7 +198,7 @@ async function doOneWorkImpl(
         uriString: uri.toString(true),
         matchesLength: matches.length,
     });
-    if (matches.length !== 0 && !cancellationToken.isCancellationRequested) {
+    if (matches.length !== 0 && !abortSignal.aborted) {
         await setTreeFileMatches(uri, document, matches);
     }
 }
