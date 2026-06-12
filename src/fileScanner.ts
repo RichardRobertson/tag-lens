@@ -2,7 +2,7 @@ import PQueue from "p-queue";
 import * as vscode from "vscode";
 import { type HydratedConfig, LayeredConfig } from "./configFile";
 import type { TagMatch } from "./treeProvider";
-import { concatIterables, re2jsMatchAllWithIndices, trace } from "./util";
+import { concatIterables, re2jsMatchAllWithIndices } from "./util";
 
 const fileQueue2: PQueue = new PQueue({ concurrency: 10 });
 
@@ -97,12 +97,7 @@ async function processFile(
     layeredConfig: LayeredConfig
 ): Promise<void> {
     const document = await vscode.workspace.openTextDocument(uri);
-    if (abortSignal.aborted) {
-        trace({ id: "doOneWorkImpl:abortSignal" });
-        return;
-    }
-    if (await treeHasFile(uri)) {
-        trace({ id: "doOneWorkImpl:treeHasFile", uriString: uri.toString(true) });
+    if (abortSignal.aborted || (await treeHasFile(uri))) {
         return;
     }
     const workspace = vscode.workspace.getWorkspaceFolder(uri);
@@ -193,11 +188,6 @@ async function processFile(
             }
         }
     }
-    trace({
-        id: "doOneWorkImpl:finish",
-        uriString: uri.toString(true),
-        matchesLength: matches.length,
-    });
     if (matches.length !== 0 && !abortSignal.aborted) {
         await setTreeFileMatches(uri, document, matches);
     }

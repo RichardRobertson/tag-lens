@@ -375,8 +375,10 @@ export class TreeProvider implements vscode.TreeDataProvider<string> {
                     if (elementUriString === "") {
                         treeItem.iconPath = new vscode.ThemeIcon("files");
                         treeItem.label = vscode.l10n.t("Loose Files");
+                        treeItem.contextValue = "looseFilesNode";
                     } else {
                         treeItem.iconPath = new vscode.ThemeIcon("root-folder");
+                        treeItem.contextValue = "workspaceNode";
                     }
                     break;
                 case "folder":

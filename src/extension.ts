@@ -311,14 +311,39 @@ export function activate(context: vscode.ExtensionContext): void {
         return picked?.folder;
     }
 
+    const debounceUriMap = new Map<string, NodeJS.Timeout>();
+
+    function debounceByUri(uri: string, callback: () => void, delay: number): void {
+        const existing = debounceUriMap.get(uri);
+        if (existing) {
+            clearTimeout(existing);
+        }
+        const handle = setTimeout(() => {
+            debounceUriMap.delete(uri);
+            callback();
+        }, delay);
+        debounceUriMap.set(uri, handle);
+    }
+
     context.subscriptions.push(
         vscode.commands.registerCommand(commands.rescanWorkspace, async () => {
             treeProvider.clearAll();
             await kickOffScan();
         }),
+        vscode.commands.registerCommand(commands.toggleLooseFiles, async () => {
+            const current = configuration.search.getLoose();
+            await configuration.search.updateLoose(!current);
+        }),
         vscode.commands.registerCommand(
             commands.toggleWorkspace,
-            async (workspaceFolder?: vscode.WorkspaceFolder) => {
+            async (workspaceFolder?: vscode.WorkspaceFolder | string) => {
+                if (typeof workspaceFolder === "string") {
+                    const workspaceNode: { type: "real"; uriString: string } =
+                        JSON.parse(workspaceFolder);
+                    workspaceFolder = vscode.workspace.getWorkspaceFolder(
+                        vscode.Uri.parse(workspaceNode.uriString)
+                    );
+                }
                 if (workspaceFolder === undefined) {
                     const picked = await pickWorkspaceFolder();
                     if (picked === undefined) {
@@ -333,37 +358,38 @@ export function activate(context: vscode.ExtensionContext): void {
                 const workspaceFolderUriString = workspaceFolder.uri.toString(true);
                 if (disabledWorkspaceFolders[workspaceFolderUriString]) {
                     delete disabledWorkspaceFolders[workspaceFolderUriString];
-                    const visibleEditorUris = vscode.window.visibleTextEditors.map<
-                        [vscode.Uri, string]
-                    >((editor) => [editor.document.uri, editor.document.uri.toString(true)]);
+                    const visibleEditorUris = vscode.window.visibleTextEditors.map((editor) =>
+                        editor.document.uri.toString(true)
+                    );
                     for (const uri of await vscode.workspace.findFiles(
                         new vscode.RelativePattern(workspaceFolder, "**/*")
                     )) {
                         const uriString = uri.toString(true);
-                        enqueueFileLocal(
-                            uri,
-                            visibleEditorUris.some(
-                                ([_, editorUriString]) => editorUriString === uriString
-                            )
-                        );
+                        enqueueFileLocal(uri, visibleEditorUris.includes(uriString));
                     }
                 } else {
                     disabledWorkspaceFolders[workspaceFolderUriString] = true;
                     cancelUri(workspaceFolderUriString);
+                    treeProvider.discardWorkspace(workspaceFolder);
                 }
                 await context.workspaceState.update(
                     disabledWorkspaceFolderState,
                     disabledWorkspaceFolders
                 );
-                treeProvider.discardWorkspace(workspaceFolder);
             }
         ),
         vscode.workspace.onDidChangeTextDocument((e) => {
             const eUri = e.document.uri;
             const eUriString = eUri.toString(true);
-            treeProvider.clearFile(eUri);
-            cancelUri(eUriString);
-            enqueueIfAllowed(eUri);
+            debounceByUri(
+                eUriString,
+                () => {
+                    treeProvider.clearFile(eUri);
+                    cancelUri(eUriString);
+                    enqueueIfAllowed(eUri);
+                },
+                100
+            );
         }),
         vscode.workspace.onDidRenameFiles((e) => {
             for (const { oldUri, newUri } of e.files) {
@@ -540,12 +566,6 @@ export function activate(context: vscode.ExtensionContext): void {
         workspaceConfigWatcher,
         treeView
     );
-
-    // scanDebounced();
-
-    // kickOffScan().catch((err) =>
-    //     vscode.window.showErrorMessage(`Caught error from \`kickOffScan\`: ${err}`)
-    // );
 }
 
 export function deactivate(): void {}

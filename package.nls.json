@@ -3,6 +3,7 @@
     "tag-lens.commands.openGlobalConfig.title": "Tag Lens: Open Global Configuration",
     "tag-lens.commands.openWorkspaceConfig.title": "Tag Lens: Open Workspace Configuration",
     "tag-lens.commands.scanLanguageComments.title": "Tag Lens: Scan Language Extension Comment Tokens",
+    "tag-lens.commands.toggleLooseFiles.title": "Tag Lens: Toggle Loose File Scanning",
     "tag-lens.commands.toggleWorkspace.title": "Tag Lens: Toggle Workspace Scanning",
     "tag-lens.configuration.tags.title": "Tags",
     "tag-lens.configuration.tags.markdownDescription": "Customize [global tags](command:tag-lens.openGlobalConfig) or [workspace tags](command:tag-lens.openWorkspaceConfig)",

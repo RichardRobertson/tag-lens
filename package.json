@@ -48,6 +48,10 @@
             {
                 "command": "tag-lens.toggleWorkspace",
                 "title": "%tag-lens.commands.toggleWorkspace.title%"
+            },
+            {
+                "command": "tag-lens.toggleLooseFiles",
+                "title": "%tag-lens.commands.toggleLooseFiles.title%"
             }
         ],
         "configuration": {
@@ -105,6 +109,16 @@
                     "command": "tag-lens.rescanWorkspace",
                     "group": "navigation",
                     "when": "view == tag-lens.tree-view"
+                }
+            ],
+            "view/item/context": [
+                {
+                    "command": "tag-lens.toggleLooseFiles",
+                    "when": "view == tag-lens.tree-view && viewItem == looseFilesNode"
+                },
+                {
+                    "command": "tag-lens.toggleWorkspace",
+                    "when": "view == tag-lens.tree-view && viewItem == workspaceNode"
                 }
             ]
         },
