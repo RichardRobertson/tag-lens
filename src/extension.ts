@@ -43,11 +43,12 @@ const LanguageConfigurationSchema = z.looseObject({
 type LanguageConfiguration = z.infer<typeof LanguageConfigurationSchema>;
 
 export function activate(context: vscode.ExtensionContext): void {
+    const outputChannel = vscode.window.createOutputChannel(vscode.l10n.t("Tag Lens"), {
+        log: true,
+    });
+
     function enqueueFileLocal(uri: vscode.Uri, priority: boolean): void {
         enqueueFile(uri, priority);
-        // if (tickFileScannerTimeout === undefined) {
-        //     tickFileScannerTimeout = setTimeout(tickFileScanner, 0);
-        // }
     }
 
     const diagnostics = vscode.languages.createDiagnosticCollection("tag-lens");
@@ -88,30 +89,6 @@ export function activate(context: vscode.ExtensionContext): void {
         }
     }
 
-    // let tickFileScannerTimeout: NodeJS.Timeout | undefined;
-
-    // function tickFileScanner(): void {
-    //     doOneWork(
-    //         undefined,
-    //         layeredConfig,
-    //         (uri) => treeProvider.hasNode(uri),
-    //         (uri, document, matches) => {
-    //             treeProvider.setFileMatches(uri, document, matches);
-    //         }
-    //     )
-    //         .catch((err) => {
-    //             trace({ id: "doOneWork", err });
-    //             vscode.window.showErrorMessage(`Caught error from doOneWork: ${err}`);
-    //         })
-    //         .finally(() => {
-    //             if (hasPendingWork()) {
-    //                 tickFileScannerTimeout = setTimeout(tickFileScanner, 0);
-    //             } else {
-    //                 tickFileScannerTimeout = undefined;
-    //             }
-    //         });
-    // }
-
     const lastPickedWorkspaceFolderState = "tag-lens.lastPickedWorkspaceFolder";
 
     const layeredConfig = new LayeredConfig();
@@ -122,20 +99,108 @@ export function activate(context: vscode.ExtensionContext): void {
             context.globalStorageUri,
             "tag-lens.config.jsonc"
         );
-        const workspaceConfigUris = (vscode.workspace.workspaceFolders ?? []).map((folder) => ({
+        const workspaceAndConfigUris = (vscode.workspace.workspaceFolders ?? []).map((folder) => ({
             baseUri: folder.uri,
             configUri: vscode.Uri.joinPath(folder.uri, ".vscode", "tag-lens.config.jsonc"),
         }));
+        const actions: vscode.MessageItem[] = [
+            { title: vscode.l10n.t("Open Configuration") },
+            { title: vscode.l10n.t("More Details") },
+        ];
         if (await uriExists(globalConfigUri)) {
-            layeredConfig.globalConfig = await loadConfig(globalConfigUri);
+            const configObject = await loadConfig(globalConfigUri);
+            if (configObject.type === "config") {
+                layeredConfig.globalConfig = configObject.config;
+            } else {
+                switch (configObject.type) {
+                    case "jsoncError":
+                        outputChannel.error(
+                            "Error parsing global configuration file",
+                            `"${globalConfigUri.toString(true)}"`
+                        );
+                        for (const { error, offset, length } of configObject.error) {
+                            outputChannel.error(
+                                JSONC.printParseErrorCode(error),
+                                "at offset",
+                                offset,
+                                "; length",
+                                length
+                            );
+                        }
+                        break;
+                    case "zodError":
+                        outputChannel.error(
+                            "Schema error in global configuration file",
+                            `"${globalConfigUri.toString(true)}"`
+                        );
+                        outputChannel.error(z.prettifyError(configObject.error));
+                        break;
+                }
+                vscode.window
+                    .showErrorMessage(
+                        vscode.l10n.t(
+                            "The global configuration file contains errors and could not be loaded."
+                        ),
+                        ...actions
+                    )
+                    .then((action) => {
+                        if (action === actions[0]) {
+                            vscode.window.showTextDocument(globalConfigUri);
+                        } else if (action === actions[1]) {
+                            outputChannel.show(true);
+                        }
+                    });
+            }
         }
         await Promise.all(
-            workspaceConfigUris.map(async (workspaceConfigUri) => {
-                if (await uriExists(workspaceConfigUri.configUri)) {
-                    layeredConfig.workspaceConfigs.set(
-                        workspaceConfigUri.baseUri.toString(true),
-                        await loadConfig(workspaceConfigUri.configUri)
-                    );
+            workspaceAndConfigUris.map(async ({ baseUri, configUri }) => {
+                if (await uriExists(configUri)) {
+                    const configObject = await loadConfig(configUri);
+                    if (configObject.type === "config") {
+                        layeredConfig.workspaceConfigs.set(
+                            baseUri.toString(true),
+                            configObject.config
+                        );
+                    } else {
+                        switch (configObject.type) {
+                            case "jsoncError":
+                                outputChannel.error(
+                                    "Error parsing workspace configuration file",
+                                    `"${configUri.toString(true)}"`
+                                );
+                                for (const { error, offset, length } of configObject.error) {
+                                    outputChannel.error(
+                                        JSONC.printParseErrorCode(error),
+                                        "at offset",
+                                        offset,
+                                        "; length",
+                                        length
+                                    );
+                                }
+                                break;
+                            case "zodError":
+                                outputChannel.error(
+                                    "Schema error in global configuration file",
+                                    `"${configUri.toString(true)}"`
+                                );
+                                outputChannel.error(z.prettifyError(configObject.error));
+                                break;
+                        }
+                        vscode.window
+                            .showErrorMessage(
+                                vscode.l10n.t(
+                                    "A workspace configuration file contains errors and could not be loaded."
+                                ),
+                                ...actions
+                            )
+                            .then((action) => {
+                                if (action === actions[0]) {
+                                    vscode.window.showTextDocument(configUri);
+                                } else if (action === actions[1]) {
+                                    outputChannel.show(true);
+                                }
+                            });
+                    }
                 }
             })
         );

@@ -2,6 +2,7 @@ import assert from "node:assert";
 import * as JSONC from "jsonc-parser";
 import { RE2JS } from "re2js";
 import * as vscode from "vscode";
+import type { ZodError, z } from "zod";
 import {
     type Color,
     type Comment,
@@ -13,12 +14,27 @@ import {
     type ExtendsTags,
 } from "./configFileSchema";
 
-export async function loadConfig(uri: vscode.Uri): Promise<Config> {
+export async function loadConfig(
+    uri: vscode.Uri
+): Promise<
+    | { type: "config"; config: Config }
+    | { type: "jsoncError"; error: JSONC.ParseError[] }
+    | { type: "zodError"; error: ZodError<z.output<typeof ConfigFileSchema>> }
+> {
     const fileBytes = await vscode.workspace.fs.readFile(uri);
     const textDecoder = new TextDecoder("utf-8");
     const fileString = textDecoder.decode(fileBytes);
-    const fileObject = JSONC.parse(fileString);
-    return normalizeConfig(ConfigFileSchema.parse(fileObject));
+    const jsoncErrors: JSONC.ParseError[] = [];
+    const fileObject = JSONC.parse(fileString, jsoncErrors);
+    if (jsoncErrors.length !== 0) {
+        return { type: "jsoncError", error: jsoncErrors };
+    }
+    const configObject = ConfigFileSchema.safeParse(fileObject);
+    if (configObject.success) {
+        return { type: "config", config: normalizeConfig(configObject.data) };
+    } else {
+        return { type: "zodError", error: configObject.error };
+    }
 }
 
 function normalizeColor(color: Color | undefined): string | vscode.ThemeColor | undefined {
