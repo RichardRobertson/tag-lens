@@ -1,10 +1,11 @@
+import assert from "node:assert";
 import * as commands from "@generated/commands";
 import * as configuration from "@generated/configuration";
 import * as views from "@generated/views";
 import * as JSONC from "jsonc-parser";
 import * as vscode from "vscode";
 import z from "zod";
-import { LayeredConfig, loadConfig } from "./configFile";
+import { initConfigFile, LayeredConfig, loadConfig, registerProvider } from "./configFile";
 import { cancelUri, enqueueFile, fileScannerUpdateConfig, initFileScanner } from "./fileScanner";
 import { FileNodeWrapper, TreeProvider } from "./treeProvider";
 import { trace } from "./util";
@@ -42,7 +43,14 @@ const LanguageConfigurationSchema = z.looseObject({
 
 type LanguageConfiguration = z.infer<typeof LanguageConfigurationSchema>;
 
-export function activate(context: vscode.ExtensionContext): void {
+interface ProviderRegistrationOptions {
+    namespace: string;
+    configUri: vscode.Uri;
+}
+
+export function activate(context: vscode.ExtensionContext): {
+    registerProvider(options: ProviderRegistrationOptions): Promise<vscode.Disposable>;
+} {
     const outputChannel = vscode.window.createOutputChannel(vscode.l10n.t("Tag Lens"), {
         log: true,
     });
@@ -59,6 +67,10 @@ export function activate(context: vscode.ExtensionContext): void {
         (uri) => treeProvider.hasNode(uri),
         (uri, document, matches) => treeProvider.setFileMatches(uri, document, matches)
     );
+
+    const reloadProvidersEmitter = new vscode.EventEmitter<void>();
+
+    initConfigFile(reloadProvidersEmitter);
 
     async function kickOffScan(): Promise<void> {
         const visibleEditorUris = vscode.window.visibleTextEditors.map<[vscode.Uri, string]>(
@@ -627,10 +639,24 @@ export function activate(context: vscode.ExtensionContext): void {
             await vscode.window.showTextDocument(document);
         }),
         vscode.workspace.onDidChangeWorkspaceFolders(treeProvider.onDidChangeWorkspaceFolders),
+        reloadProvidersEmitter.event(() => {
+            layeredConfig.invalidateCache();
+            kickOffScan().catch((err) =>
+                vscode.window.showErrorMessage(`Caught error from scan function: ${err}`)
+            );
+        }),
+        reloadProvidersEmitter,
         globalConfigWatcher,
         workspaceConfigWatcher,
         treeView
     );
+    return {
+        registerProvider(options: ProviderRegistrationOptions): Promise<vscode.Disposable> {
+            assert(typeof options.namespace === "string");
+            assert(options.configUri instanceof vscode.Uri);
+            return registerProvider(outputChannel, options.namespace, options.configUri);
+        },
+    };
 }
 
 export function deactivate(): void {}

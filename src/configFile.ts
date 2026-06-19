@@ -2,7 +2,7 @@ import assert from "node:assert";
 import * as JSONC from "jsonc-parser";
 import { RE2JS } from "re2js";
 import * as vscode from "vscode";
-import type { ZodError, z } from "zod";
+import { type ZodError, z } from "zod";
 import {
     type Color,
     type Comment,
@@ -241,13 +241,17 @@ export class LayeredConfig {
     clear(): void {
         this.globalConfig = defaultConfig();
         this.workspaceConfigs.clear();
+        this.invalidateCache();
+    }
+
+    invalidateCache(): void {
         this._effectiveGlobalConfig = undefined;
         this.effectiveWorkspaceConfigs.clear();
     }
 
     get effectiveGlobalConfig(): HydratedConfig {
         if (this._effectiveGlobalConfig === undefined) {
-            const config = hydrateConfig(this.globalConfig, "global");
+            const config = hydrateConfig(this.globalConfig, "global", providers);
             const namespacedStyles = new Map<string, Style>();
             for (const [key, style] of config.styles) {
                 namespacedStyles.set(`global:${key}`, style);
@@ -275,7 +279,7 @@ export class LayeredConfig {
         const workspaceConfig = hydrateConfig(
             rawWorkspaceConfig,
             "workspace",
-            new Map([["global", this.effectiveGlobalConfig]])
+            new Map([["global", this.effectiveGlobalConfig], ...providers.entries()])
         );
         const namespacedStyles = new Map<string, Style>();
         for (const [key, style] of workspaceConfig.styles) {
@@ -290,6 +294,7 @@ export class LayeredConfig {
 
     *getStyles(): Iterable<[string, Style]> {
         yield* this.effectiveGlobalConfig.styles;
+        yield* providers.values().flatMap((hydratedConfig) => hydratedConfig.styles);
         for (const workspaceKey of this.workspaceConfigs.keys()) {
             yield* this.getEffectiveWorkspaceConfig(workspaceKey).styles;
         }
@@ -469,4 +474,78 @@ function hydrateConfig(
             commentTags: brokenCommentTagLinks,
         },
     };
+}
+
+const providers: Map<string, HydratedConfig> = new Map();
+
+let __reloadProvidersEmitter: vscode.EventEmitter<void> | undefined;
+
+export function initConfigFile(reloadProvidersEmitter: vscode.EventEmitter<void>): void {
+    __reloadProvidersEmitter = reloadProvidersEmitter;
+}
+
+export async function registerProvider(
+    outputChannel: vscode.LogOutputChannel,
+    namespace: string,
+    configUri: vscode.Uri
+): Promise<vscode.Disposable> {
+    const configObject = await loadConfig(configUri);
+    if (configObject.type === "config") {
+        providers.set(namespace, hydrateConfig(configObject.config, namespace, providers));
+        const reloadProvidersEmitter = __reloadProvidersEmitter;
+        assert(reloadProvidersEmitter !== undefined);
+        reloadProvidersEmitter.fire();
+        return new vscode.Disposable(() => {
+            providers.delete(namespace);
+            reloadProvidersEmitter.fire();
+        });
+    }
+    switch (configObject.type) {
+        case "jsoncError":
+            outputChannel.error(
+                "Error parsing",
+                namespace,
+                "provider configuration file",
+                `"${configUri.toString(true)}"`
+            );
+            for (const { error, offset, length } of configObject.error) {
+                outputChannel.error(
+                    JSONC.printParseErrorCode(error),
+                    "at offset",
+                    offset,
+                    "; length",
+                    length
+                );
+            }
+            break;
+        case "zodError":
+            outputChannel.error(
+                "Schema error in",
+                namespace,
+                "provider configuration file",
+                `"${configUri.toString(true)}"`
+            );
+            outputChannel.error(z.prettifyError(configObject.error));
+            break;
+    }
+    const actions: vscode.MessageItem[] = [
+        { title: vscode.l10n.t("Open Configuration") },
+        { title: vscode.l10n.t("More Details") },
+    ];
+    vscode.window
+        .showErrorMessage(
+            vscode.l10n.t(
+                "The {0} provider configuration file contains errors and could not be loaded.",
+                namespace
+            ),
+            ...actions
+        )
+        .then((action) => {
+            if (action === actions[0]) {
+                vscode.window.showTextDocument(configUri);
+            } else if (action === actions[1]) {
+                outputChannel.show(true);
+            }
+        });
+    return new vscode.Disposable(() => {});
 }
