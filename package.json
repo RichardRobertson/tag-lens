@@ -99,7 +99,10 @@
         },
         "jsonValidation": [
             {
-                "fileMatch": "tag-lens.config.jsonc",
+                "fileMatch": [
+                    "tag-lens.config.jsonc",
+                    "*.tag-lens.config.jsonc"
+                ],
                 "url": "./schema/tag-lens.config.json"
             }
         ],
