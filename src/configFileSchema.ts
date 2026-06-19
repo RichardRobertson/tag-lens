@@ -59,7 +59,10 @@ export const StyleSchema = z
 export type Style = z.infer<typeof StyleSchema>;
 
 export const ExtendsSchema = z.object({
-    extends: z.array(z.string()),
+    extends: z.array(z.string()).meta({
+        description:
+            "An array of tag group names from this file or from well-known configurations such as `global:`",
+    }),
 });
 
 export type Extends = z.infer<typeof ExtendsSchema>;
@@ -110,12 +113,24 @@ export type Comment = z.infer<typeof CommentSchema>;
 
 export const ConfigFileSchema = z
     .object({
-        $schema: z.string().optional(),
-        tagGroups: z.record(z.string(), ExtendsTagsSchema),
-        tags: z.record(z.string(), ExtendsTagsSchema),
-        commentTokens: z.record(z.string(), CommentSchema),
-        commentTags: ExtendsTagsSchema,
-        styles: z.record(z.string(), StyleSchema),
+        $schema: z.string().meta({ description: "JSON Schema URI" }),
+        tagGroups: z
+            .record(z.string(), ExtendsTagsSchema)
+            .meta({ description: "Record of named tag groups that can be referenced elsewhere" }),
+        tags: z.record(z.string(), ExtendsTagsSchema).meta({
+            description:
+                'Record of language name keys (or `"*"` for all languages) to apply tags to',
+        }),
+        commentTokens: z.record(z.string(), CommentSchema).meta({
+            description:
+                'Record of language name keys (`"*"` not allowed here) to specify comment start and end tokens',
+        }),
+        commentTags: ExtendsTagsSchema.meta({
+            description: "The tags to apply within comments matched by `commentTokens`",
+        }),
+        styles: z
+            .record(z.string(), StyleSchema)
+            .meta({ description: "Record of named styles that can be referenced by tags" }),
     })
     .partial();
 
