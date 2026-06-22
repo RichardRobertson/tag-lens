@@ -14,21 +14,43 @@ import {
     type ExtendsTags,
 } from "./configFileSchema";
 
-export async function loadConfig(
-    uri: vscode.Uri
-): Promise<
+export type LoadConfigReturn =
     | { type: "config"; config: Config }
+    | { type: "ioError"; error: Error | string }
     | { type: "jsoncError"; error: JSONC.ParseError[] }
-    | { type: "zodError"; error: ZodError<z.output<typeof ConfigFileSchema>> }
-> {
-    const fileBytes = await vscode.workspace.fs.readFile(uri);
-    const textDecoder = new TextDecoder("utf-8");
-    const fileString = textDecoder.decode(fileBytes);
+    | { type: "zodError"; error: ZodError<z.output<typeof ConfigFileSchema>> };
+
+export async function loadConfigUri(uri: vscode.Uri): Promise<LoadConfigReturn> {
+    try {
+        const fileBytes = await vscode.workspace.fs.readFile(uri);
+        const textDecoder = new TextDecoder("utf-8");
+        const fileString = textDecoder.decode(fileBytes);
+        return loadConfigJson(fileString);
+    } catch (error) {
+        if (error instanceof Error) {
+            return {
+                type: "ioError",
+                error,
+            };
+        } else {
+            return {
+                type: "ioError",
+                error: `${error}`,
+            };
+        }
+    }
+}
+
+export function loadConfigJson(fileString: string): LoadConfigReturn {
     const jsoncErrors: JSONC.ParseError[] = [];
     const fileObject = JSONC.parse(fileString, jsoncErrors);
     if (jsoncErrors.length !== 0) {
         return { type: "jsoncError", error: jsoncErrors };
     }
+    return loadConfigObject(fileObject);
+}
+
+export function loadConfigObject(fileObject: object): LoadConfigReturn {
     const configObject = ConfigFileSchema.safeParse(fileObject);
     if (configObject.success) {
         return { type: "config", config: normalizeConfig(configObject.data) };
@@ -484,13 +506,30 @@ export function initConfigFile(reloadProvidersEmitter: vscode.EventEmitter<void>
     __reloadProvidersEmitter = reloadProvidersEmitter;
 }
 
+export interface ProviderUri {
+    type: "uri";
+    configUri: vscode.Uri;
+}
+
+export interface ProviderJson {
+    type: "json";
+    configJson: string;
+}
+
+export interface ProviderObject {
+    type: "object";
+    configObject: object;
+}
+
+export type ProviderConfig = ProviderUri | ProviderJson | ProviderObject;
+
 export async function registerProvider(
     outputChannel: vscode.LogOutputChannel,
     namespace: string,
     configUri: vscode.Uri
 ): Promise<vscode.Disposable> {
-    const configObject = await loadConfig(configUri);
-    if (configObject.type === "config") {
+    const configObject = await loadConfigUri(configUri);
+    if (isValidOrPrintError(configObject, configUri, outputChannel, `${namespace} provider`)) {
         providers.set(namespace, hydrateConfig(configObject.config, namespace, providers));
         const reloadProvidersEmitter = __reloadProvidersEmitter;
         assert(reloadProvidersEmitter !== undefined);
@@ -500,11 +539,31 @@ export async function registerProvider(
             reloadProvidersEmitter.fire();
         });
     }
+    return new vscode.Disposable(() => {});
+}
+
+export function isValidOrPrintError(
+    configObject: LoadConfigReturn,
+    configUri: vscode.Uri,
+    outputChannel: vscode.LogOutputChannel,
+    scope: string
+): configObject is Extract<LoadConfigReturn, { type: "config" }> {
     switch (configObject.type) {
+        case "config":
+            return true;
+        case "ioError":
+            outputChannel.error(
+                "Error reading",
+                scope,
+                "provider file",
+                `"${configUri.toString(true)}"`
+            );
+            outputChannel.error(configObject.error);
+            break;
         case "jsoncError":
             outputChannel.error(
                 "Error parsing",
-                namespace,
+                scope,
                 "provider configuration file",
                 `"${configUri.toString(true)}"`
             );
@@ -521,31 +580,30 @@ export async function registerProvider(
         case "zodError":
             outputChannel.error(
                 "Schema error in",
-                namespace,
+                scope,
                 "provider configuration file",
                 `"${configUri.toString(true)}"`
             );
             outputChannel.error(z.prettifyError(configObject.error));
             break;
     }
-    const actions: vscode.MessageItem[] = [
-        { title: vscode.l10n.t("Open Configuration") },
-        { title: vscode.l10n.t("More Details") },
-    ];
+    const openConfiguration: vscode.MessageItem = { title: vscode.l10n.t("Open Configuration") };
+    const moreDetails: vscode.MessageItem = { title: vscode.l10n.t("More Details") };
     vscode.window
         .showErrorMessage(
             vscode.l10n.t(
-                "The {0} provider configuration file contains errors and could not be loaded.",
-                namespace
+                "The {0} configuration file contains errors and could not be loaded.",
+                scope
             ),
-            ...actions
+            openConfiguration,
+            moreDetails
         )
         .then((action) => {
-            if (action === actions[0]) {
+            if (action === openConfiguration) {
                 vscode.window.showTextDocument(configUri);
-            } else if (action === actions[1]) {
+            } else if (action === moreDetails) {
                 outputChannel.show(true);
             }
         });
-    return new vscode.Disposable(() => {});
+    return false;
 }
