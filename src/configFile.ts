@@ -357,7 +357,7 @@ export interface HydratedTag {
     tag: Tag;
     origin: {
         key?: string | number;
-        scope?: string;
+        namespace?: string;
     }[];
 }
 
@@ -376,7 +376,7 @@ export interface HydratedConfig {
 
 function hydrateConfig(
     config: Config,
-    scope: string,
+    namespace: string,
     knownConfigs: Map<string, HydratedConfig> = new Map()
 ): HydratedConfig {
     const knownReferences = new Map<string, HydratedTag[]>();
@@ -439,7 +439,7 @@ function hydrateConfig(
                     tag: hydratedTag.tag,
                     origin: hydratedTag.origin.concat({
                         key,
-                        scope,
+                        namespace,
                     }),
                 }))
             );
@@ -450,7 +450,7 @@ function hydrateConfig(
                 origin: [
                     {
                         key,
-                        scope,
+                        namespace,
                     },
                 ],
             }))
@@ -526,7 +526,7 @@ export type ProviderConfig = ProviderUri | ProviderJson | ProviderObject;
 
 export type ProviderRegistrationOptions = ProviderCommonOptions & ProviderConfig;
 
-export async function registerProvider(
+export async function contributeNamespace(
     callerContext: vscode.ExtensionContext,
     outputChannel: vscode.LogOutputChannel,
     providerOptions: ProviderRegistrationOptions

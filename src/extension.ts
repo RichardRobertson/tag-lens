@@ -6,12 +6,12 @@ import * as JSONC from "jsonc-parser";
 import * as vscode from "vscode";
 import z from "zod";
 import {
+    contributeNamespace,
     initConfigFile,
     isValidOrPrintError,
     LayeredConfig,
     loadConfigUri,
     type ProviderRegistrationOptions,
-    registerProvider,
 } from "./configFile";
 import { cancelUri, enqueueFile, fileScannerUpdateConfig, initFileScanner } from "./fileScanner";
 import { FileNodeWrapper, TreeProvider } from "./treeProvider";
@@ -51,7 +51,7 @@ const LanguageConfigurationSchema = z.looseObject({
 type LanguageConfiguration = z.infer<typeof LanguageConfigurationSchema>;
 
 export function activate(context: vscode.ExtensionContext): {
-    registerProvider(
+    contributeNamespace(
         callerContext: vscode.ExtensionContext,
         options: ProviderRegistrationOptions
     ): Promise<vscode.Disposable>;
@@ -574,7 +574,7 @@ export function activate(context: vscode.ExtensionContext): {
         treeView
     );
     return {
-        registerProvider(
+        contributeNamespace(
             callerContext: vscode.ExtensionContext,
             options: ProviderRegistrationOptions
         ): Promise<vscode.Disposable> {
@@ -586,7 +586,7 @@ export function activate(context: vscode.ExtensionContext): {
                     ("configJson" in options && typeof options.configJson === "string") ||
                     ("configObject" in options && options.configObject !== undefined)
             );
-            return registerProvider(callerContext, outputChannel, options);
+            return contributeNamespace(callerContext, outputChannel, options);
         },
     };
 }
