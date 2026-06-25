@@ -556,12 +556,18 @@ export async function registerProvider(
         const reloadProvidersEmitter = __reloadProvidersEmitter;
         assert(reloadProvidersEmitter !== undefined);
         reloadProvidersEmitter.fire();
-        return {
+        let disposed = false;
+        const disposable = {
             dispose(): void {
-                providers.delete(namespace);
-                reloadProvidersEmitter.fire();
+                if (!disposed) {
+                    providers.delete(namespace);
+                    reloadProvidersEmitter.fire();
+                    disposed = true;
+                }
             },
         };
+        callerContext.subscriptions.push(disposable);
+        return disposable;
     }
     return {
         dispose(): void {},
