@@ -506,40 +506,66 @@ export function initConfigFile(reloadProvidersEmitter: vscode.EventEmitter<void>
     __reloadProvidersEmitter = reloadProvidersEmitter;
 }
 
+export interface ProviderCommonOptions {
+    namespace: string;
+}
+
 export interface ProviderUri {
-    type: "uri";
     configUri: vscode.Uri;
 }
 
 export interface ProviderJson {
-    type: "json";
     configJson: string;
 }
 
 export interface ProviderObject {
-    type: "object";
     configObject: object;
 }
 
 export type ProviderConfig = ProviderUri | ProviderJson | ProviderObject;
 
+export type ProviderRegistrationOptions = ProviderCommonOptions & ProviderConfig;
+
 export async function registerProvider(
+    callerContext: vscode.ExtensionContext,
     outputChannel: vscode.LogOutputChannel,
-    namespace: string,
-    configUri: vscode.Uri
+    providerOptions: ProviderRegistrationOptions
 ): Promise<vscode.Disposable> {
-    const configObject = await loadConfigUri(configUri);
-    if (isValidOrPrintError(configObject, configUri, outputChannel, `${namespace} provider`)) {
+    const namespace = providerOptions.namespace;
+    let configUri = vscode.Uri.joinPath(callerContext.extensionUri, "__virtual__");
+    let configObject: LoadConfigReturn;
+    if ("configUri" in providerOptions) {
+        configUri = providerOptions.configUri;
+        configObject = await loadConfigUri(configUri);
+    } else if ("configJson" in providerOptions) {
+        configObject = loadConfigJson(providerOptions.configJson);
+    } else if ("configObject" in providerOptions) {
+        configObject = loadConfigObject(providerOptions.configObject);
+    } else {
+        throw new Error("unreachable");
+    }
+    if (
+        isValidOrPrintError(
+            configObject,
+            configUri,
+            outputChannel,
+            `${namespace} provider (${callerContext.extension.id})`
+        )
+    ) {
         providers.set(namespace, hydrateConfig(configObject.config, namespace, providers));
         const reloadProvidersEmitter = __reloadProvidersEmitter;
         assert(reloadProvidersEmitter !== undefined);
         reloadProvidersEmitter.fire();
-        return new vscode.Disposable(() => {
-            providers.delete(namespace);
-            reloadProvidersEmitter.fire();
-        });
+        return {
+            dispose(): void {
+                providers.delete(namespace);
+                reloadProvidersEmitter.fire();
+            },
+        };
     }
-    return new vscode.Disposable(() => {});
+    return {
+        dispose(): void {},
+    };
 }
 
 export function isValidOrPrintError(

@@ -10,6 +10,7 @@ import {
     isValidOrPrintError,
     LayeredConfig,
     loadConfigUri,
+    type ProviderRegistrationOptions,
     registerProvider,
 } from "./configFile";
 import { cancelUri, enqueueFile, fileScannerUpdateConfig, initFileScanner } from "./fileScanner";
@@ -49,13 +50,11 @@ const LanguageConfigurationSchema = z.looseObject({
 
 type LanguageConfiguration = z.infer<typeof LanguageConfigurationSchema>;
 
-interface ProviderRegistrationOptions {
-    namespace: string;
-    configUri: vscode.Uri;
-}
-
 export function activate(context: vscode.ExtensionContext): {
-    registerProvider(options: ProviderRegistrationOptions): Promise<vscode.Disposable>;
+    registerProvider(
+        callerContext: vscode.ExtensionContext,
+        options: ProviderRegistrationOptions
+    ): Promise<vscode.Disposable>;
 } {
     const outputChannel = vscode.window.createOutputChannel(vscode.l10n.t("Tag Lens"), {
         log: true,
@@ -575,10 +574,19 @@ export function activate(context: vscode.ExtensionContext): {
         treeView
     );
     return {
-        registerProvider(options: ProviderRegistrationOptions): Promise<vscode.Disposable> {
+        registerProvider(
+            callerContext: vscode.ExtensionContext,
+            options: ProviderRegistrationOptions
+        ): Promise<vscode.Disposable> {
+            assert(callerContext !== undefined);
+            assert(options !== undefined);
             assert(typeof options.namespace === "string");
-            assert(options.configUri instanceof vscode.Uri);
-            return registerProvider(outputChannel, options.namespace, options.configUri);
+            assert(
+                ("configUri" in options && options.configUri instanceof vscode.Uri) ||
+                    ("configJson" in options && typeof options.configJson === "string") ||
+                    ("configObject" in options && options.configObject !== undefined)
+            );
+            return registerProvider(callerContext, outputChannel, options);
         },
     };
 }
