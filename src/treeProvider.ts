@@ -335,7 +335,7 @@ interface SyntheticNode {
 
 type ProjectedNode = RealNode | SyntheticNode;
 
-export class TreeProvider implements vscode.TreeDataProvider<string> {
+export class TagsTreeProvider implements vscode.TreeDataProvider<string> {
     private readonly nodeMap = new Map<string, Node>();
 
     private readonly emitOnDidChangeTreeData = new vscode.EventEmitter<string | undefined>();
@@ -816,11 +816,11 @@ export class TreeProvider implements vscode.TreeDataProvider<string> {
     }
 
     fireOnDidChangeTreeData(element?: ProjectedNode): void {
-        trace({
-            id: "treeProvider.onDidChangeTreeData",
-            element,
-            stack: new Error().stack,
-        });
+        // trace({
+        //     id: "treeProvider.onDidChangeTreeData",
+        //     element,
+        //     stack: new Error().stack,
+        // });
         this.emitOnDidChangeTreeData.fire(
             element === undefined ? undefined : JSON.stringify(element)
         );

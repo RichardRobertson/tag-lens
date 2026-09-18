@@ -82,3 +82,14 @@ export function* re2jsMatchAllWithIndices(
         yield result;
     }
 }
+
+export function reorderKeys<T>(
+    container: Record<string, T>,
+    valueMap: (value: T) => T = (value: T) => value
+): Record<string, T> {
+    return Object.fromEntries(
+        Object.entries(container)
+            .sort(([a], [b]) => (a < b ? -1 : 1))
+            .map(([key, value]) => [key, valueMap(value)])
+    );
+}

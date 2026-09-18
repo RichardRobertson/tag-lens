@@ -1,0 +1,51 @@
+Redesign entire config system
+
+- URI redesign `taglens://<source>/<type>/<id>#<label?>`
+    - Source can be one of `user`, encoded workspace URI, or extension ID
+    - Type can be one of `pattern`, `style`, `diagnostic`, `template`
+- Patterns get added to the global list from any source
+    - Key by URI `taglens://<source>/pattern/<id>#<label?>`
+    - UUID for identity stability
+        - Required for contributions
+        - Generate one for user config files if blank
+            - Can use `jsonc-parser` with edits to insert properties and follow formatting read from `editor.options.insertSpaces` and related properties
+    - Literal or regular expression
+    - Optional case insensitivity
+    - Optional dot all for regex
+    - Optional label for ease of reading
+- Styles get added to a global palette from any source
+    - Key by URI `taglens://<source>/style/<id>#<label?>`
+    - UUID for identity stability
+    - Style encodes `vscode.DecorationRenderOptions`
+    - Optional label for ease of reading
+- Diagnostics get added to a global palette from any source
+    - Key by URI `taglens://<source>/diagnostic/<id>#<label?>`
+    - UUID for identity stability
+    - Severity is `vscode.DiagnosticSeverity`
+    - Optional custom message may include regex replacements
+        - `$0` will be either matched literal or entire regex match
+        - Capture groups will be substituted with `""` if they did not participate
+    - Optional label for ease of reading
+- Templates can be contributed
+    - Key by URI `taglens://<source>/template/<id>#<label?>`
+    - Prebuilt tag plus style lists that can be enabled wholesale or copied and customized
+- Comment tokens are defined globally and separately from config files
+    - Line comment start
+    - Block comment start and end pair
+- Tag list
+    - Show all patterns
+    - Context:
+        - **Always**: Decorate this tag regardless of whether it is in a comment span or not
+        - **Inside Comments**: Decorate this tag when found in a comment span
+        - **Outside Comments**: Decorate this tag when found outside a comment span
+    - Optional style and/or diagnostic per tag+context pair with mix and match
+        - Example
+            - "TODO"
+                - Always
+                    - Diagnostic info "TODO item"
+                - Inside Comments
+                    - Background green
+                    - Foreground white
+                - Outside Comments
+                    - Italic true
+- URI references clear the fragment when used as collection keys

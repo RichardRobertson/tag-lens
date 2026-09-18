@@ -1,0 +1,94 @@
+{
+    "$schema": "../schema/tag-lens.config.json",
+    "tagGroups": {
+        "BUG": [
+            {
+                "match": {
+                    "literal": "BUG"
+                },
+                "decorationStyle": "BUG"
+            }
+        ],
+        "HACK": [
+            {
+                "match": {
+                    "literal": "HACK"
+                },
+                "decorationStyle": "HACK"
+            }
+        ],
+        "FIXME": [
+            {
+                "match": {
+                    "literal": "FIXME"
+                },
+                "decorationStyle": "FIXME"
+            }
+        ],
+        "TODO": [
+            {
+                "match": {
+                    "literal": "TODO"
+                },
+                "decorationStyle": "TODO"
+            }
+        ],
+        "XXX": [
+            {
+                "match": {
+                    "literal": "XXX"
+                },
+                "decorationStyle": "XXX"
+            }
+        ],
+        "[ ]": [
+            {
+                "match": {
+                    "literal": "[ ]"
+                },
+                "decorationStyle": "[ ]"
+            }
+        ],
+        "[x]": [
+            {
+                "match": {
+                    "literal": "[x]"
+                },
+                "decorationStyle": "[x]"
+            }
+        ],
+        "default-comment-tags": {
+            "extends": ["BUG", "HACK", "FIXME", "TODO", "XXX", "[ ]", "[x]"]
+        }
+    },
+    "styles": {
+        "BUG": {
+            "backgroundColor": "red",
+            "foregroundColor": "white"
+        },
+        "HACK": {
+            "backgroundColor": "orange",
+            "foregroundColor": "black"
+        },
+        "FIXME": {
+            "backgroundColor": "yellow",
+            "foregroundColor": "black"
+        },
+        "TODO": {
+            "backgroundColor": "green",
+            "foregroundColor": "white"
+        },
+        "XXX": {
+            "backgroundColor": "blue",
+            "foregroundColor": "white"
+        },
+        "[ ]": {
+            "backgroundColor": "indigo",
+            "foregroundColor": "white"
+        },
+        "[x]": {
+            "backgroundColor": "violet",
+            "foregroundColor": "black"
+        }
+    }
+}

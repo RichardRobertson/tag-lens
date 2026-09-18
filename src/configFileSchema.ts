@@ -1,5 +1,3 @@
-/** biome-ignore-all lint/nursery/useExplicitType: Zod object types don't exist before the object does. Type must be implied. */
-
 import { z } from "zod";
 
 export const TagDiagnosticSchema = z.object({

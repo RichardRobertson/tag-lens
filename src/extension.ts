@@ -2,9 +2,10 @@ import assert from "node:assert";
 import * as commands from "@generated/commands";
 import * as configuration from "@generated/configuration";
 import * as views from "@generated/views";
-import * as JSONC from "jsonc-parser";
+import Handlebars from "handlebars";
 import * as vscode from "vscode";
 import z from "zod";
+import { getExtensionLanguageCommentTokens } from "./commentTokens";
 import {
     contributeNamespace,
     initConfigFile,
@@ -14,48 +15,35 @@ import {
     type ProviderRegistrationOptions,
 } from "./configFile";
 import { cancelUri, enqueueFile, fileScannerUpdateConfig, initFileScanner } from "./fileScanner";
-import { FileNodeWrapper, TreeProvider } from "./treeProvider";
+import { SourcesTreeProvider } from "./sourcesTreeProvider";
+import { FileNodeWrapper, TagsTreeProvider } from "./treeProvider";
 import { trace } from "./util";
+import type { WebViewMessage } from "./webviewMessage";
 
 export const openTagLinkCommand = "tag-lens.openTagLink";
 const disabledWorkspaceFolderState = "tag-lens.disabledWorkspaceFolderState";
 
-// biome-ignore lint/nursery/useExplicitType: Zod object types don't exist before the object does. Type must be implied.
-const PackageJsonLanguageContributionSchema = z.looseObject({
-    name: z.string(),
-    contributes: z.looseObject({
-        languages: z.array(
-            z.looseObject({
-                id: z.string(),
-                configuration: z.string(),
-            })
-        ),
-    }),
+const webViewDataSchema = z.object({
+    type: z.literal("apply"),
+    data: z.record(z.string(), z.string()),
 });
 
-// biome-ignore lint/nursery/useExplicitType: Zod object types don't exist before the object does. Type must be implied.
-const LanguageConfigurationSchema = z.looseObject({
-    comments: z.looseObject({
-        lineComment: z
-            .xor([
-                z.string(),
-                z.looseObject({
-                    comment: z.string(),
-                }),
-            ])
-            .optional(),
-        blockComment: z.tuple([z.string(), z.string()]).optional(),
-    }),
-});
-
-type LanguageConfiguration = z.infer<typeof LanguageConfigurationSchema>;
-
-export function activate(context: vscode.ExtensionContext): {
+export async function activate(context: vscode.ExtensionContext): Promise<{
     contributeNamespace(
         callerContext: vscode.ExtensionContext,
         options: ProviderRegistrationOptions
     ): Promise<vscode.Disposable>;
-} {
+}> {
+    Handlebars.registerHelper("and", (a, b) => a && b);
+    Handlebars.registerHelper("not", (value) => !value);
+    const commentTokensTemplate = Handlebars.compile(
+        new TextDecoder("utf-8").decode(
+            await vscode.workspace.fs.readFile(
+                vscode.Uri.joinPath(context.extensionUri, "resources", "commentTokens.handlebars")
+            )
+        )
+    );
+
     const outputChannel = vscode.window.createOutputChannel(vscode.l10n.t("Tag Lens"), {
         log: true,
     });
@@ -66,11 +54,13 @@ export function activate(context: vscode.ExtensionContext): {
 
     const diagnostics = vscode.languages.createDiagnosticCollection("tag-lens");
 
-    const treeProvider = new TreeProvider(diagnostics);
+    const tagsTreeProvider = new TagsTreeProvider(diagnostics);
+
+    const sourcesTreeProvider = new SourcesTreeProvider();
 
     initFileScanner(
-        (uri) => treeProvider.hasNode(uri),
-        (uri, document, matches) => treeProvider.setFileMatches(uri, document, matches)
+        (uri) => tagsTreeProvider.hasNode(uri),
+        (uri, document, matches) => tagsTreeProvider.setFileMatches(uri, document, matches)
     );
 
     const reloadProvidersEmitter = new vscode.EventEmitter<void>();
@@ -78,32 +68,33 @@ export function activate(context: vscode.ExtensionContext): {
     initConfigFile(reloadProvidersEmitter);
 
     async function kickOffScan(): Promise<void> {
-        const visibleEditorUris = vscode.window.visibleTextEditors.map<[vscode.Uri, string]>(
-            (editor) => [editor.document.uri, editor.document.uri.toString(true)]
-        );
-        const disabledWorkspaceFolders = context.workspaceState.get(
-            disabledWorkspaceFolderState,
-            {} as Record<string, boolean>
-        );
-        for (const workspaceFolder of vscode.workspace.workspaceFolders ?? []) {
-            if (disabledWorkspaceFolders[workspaceFolder.uri.toString(true)]) {
-                continue;
-            }
-            for (const uri of await vscode.workspace.findFiles(
-                new vscode.RelativePattern(workspaceFolder, "**/*")
-            )) {
-                const uriString = uri.toString(true);
-                enqueueFileLocal(
-                    uri,
-                    visibleEditorUris.some(([_, editorUriString]) => editorUriString === uriString)
-                );
-            }
-        }
-        if (configuration.search.getLoose()) {
-            for (const [editorUri, _] of visibleEditorUris) {
-                enqueueFileLocal(editorUri, true);
-            }
-        }
+        const todo = {};
+        // const visibleEditorUris = vscode.window.visibleTextEditors.map<[vscode.Uri, string]>(
+        //     (editor) => [editor.document.uri, editor.document.uri.toString(true)]
+        // );
+        // const disabledWorkspaceFolders = context.workspaceState.get(
+        //     disabledWorkspaceFolderState,
+        //     {} as Record<string, boolean>
+        // );
+        // for (const workspaceFolder of vscode.workspace.workspaceFolders ?? []) {
+        //     if (disabledWorkspaceFolders[workspaceFolder.uri.toString(true)]) {
+        //         continue;
+        //     }
+        //     for (const uri of await vscode.workspace.findFiles(
+        //         new vscode.RelativePattern(workspaceFolder, "**/*")
+        //     )) {
+        //         const uriString = uri.toString(true);
+        //         enqueueFileLocal(
+        //             uri,
+        //             visibleEditorUris.some(([_, editorUriString]) => editorUriString === uriString)
+        //         );
+        //     }
+        // }
+        // if (configuration.search.getLoose()) {
+        //     for (const [editorUri, _] of visibleEditorUris) {
+        //         enqueueFileLocal(editorUri, true);
+        //     }
+        // }
     }
 
     const lastPickedWorkspaceFolderState = "tag-lens.lastPickedWorkspaceFolder";
@@ -139,7 +130,7 @@ export function activate(context: vscode.ExtensionContext): {
                 }
             })
         );
-        treeProvider.clearAll();
+        tagsTreeProvider.clearAll();
         fileScannerUpdateConfig(layeredConfig);
         buildStyles();
         await kickOffScan();
@@ -208,7 +199,7 @@ export function activate(context: vscode.ExtensionContext): {
             for (const style of styles.values()) {
                 editor.setDecorations(style, []);
             }
-            const fileNode = treeProvider.getNode(editor.document.uri);
+            const fileNode = tagsTreeProvider.getNode(editor.document.uri);
             if (fileNode instanceof FileNodeWrapper) {
                 const decorations = new Map<string, vscode.Range[]>();
                 for (const tagNode of fileNode.children()) {
@@ -233,10 +224,14 @@ export function activate(context: vscode.ExtensionContext): {
         }
     }
 
-    treeProvider.onDidChangeTreeData(decorateEditors);
+    tagsTreeProvider.onDidChangeTreeData(decorateEditors);
 
-    const treeView = vscode.window.createTreeView(views.treeView, {
-        treeDataProvider: treeProvider,
+    const tagsTreeView = vscode.window.createTreeView(views.tagsTreeView, {
+        treeDataProvider: tagsTreeProvider,
+    });
+
+    const sourcesTreeView = vscode.window.createTreeView(views.sourcesTreeView, {
+        treeDataProvider: sourcesTreeProvider,
     });
 
     async function openOrCreateConfig(baseUri: vscode.Uri): Promise<void> {
@@ -327,7 +322,7 @@ export function activate(context: vscode.ExtensionContext): {
 
     context.subscriptions.push(
         vscode.commands.registerCommand(commands.rescanWorkspace, async () => {
-            treeProvider.clearAll();
+            tagsTreeProvider.clearAll();
             await kickOffScan();
         }),
         vscode.commands.registerCommand(commands.toggleLooseFiles, async () => {
@@ -370,7 +365,7 @@ export function activate(context: vscode.ExtensionContext): {
                 } else {
                     disabledWorkspaceFolders[workspaceFolderUriString] = true;
                     cancelUri(workspaceFolderUriString);
-                    treeProvider.discardWorkspace(workspaceFolder);
+                    tagsTreeProvider.discardWorkspace(workspaceFolder);
                 }
                 await context.workspaceState.update(
                     disabledWorkspaceFolderState,
@@ -384,7 +379,7 @@ export function activate(context: vscode.ExtensionContext): {
             debounceByUri(
                 eUriString,
                 () => {
-                    treeProvider.clearFile(eUri);
+                    tagsTreeProvider.clearFile(eUri);
                     cancelUri(eUriString);
                     enqueueIfAllowed(eUri);
                 },
@@ -393,12 +388,12 @@ export function activate(context: vscode.ExtensionContext): {
         }),
         vscode.workspace.onDidRenameFiles((e) => {
             for (const { oldUri, newUri } of e.files) {
-                treeProvider.renameFile(oldUri, newUri);
+                tagsTreeProvider.renameFile(oldUri, newUri);
             }
         }),
         vscode.workspace.onDidDeleteFiles((e) => {
             for (const uri of e.files) {
-                treeProvider.clearFile(uri);
+                tagsTreeProvider.clearFile(uri);
             }
         }),
         vscode.workspace.onDidCreateFiles((e) => {
@@ -442,7 +437,7 @@ export function activate(context: vscode.ExtensionContext): {
                 e.affectsConfiguration("explorer.compactFolders") ||
                 e.affectsConfiguration(configuration.compactFoldersFullKey)
             ) {
-                treeProvider.updateShouldCompact();
+                tagsTreeProvider.updateShouldCompact();
             }
             if (e.affectsConfiguration(configuration.search.looseFullKey)) {
                 if (configuration.search.getLoose()) {
@@ -450,7 +445,7 @@ export function activate(context: vscode.ExtensionContext): {
                         enqueueFileLocal(editor.document.uri, true);
                     }
                 } else {
-                    treeProvider.discardLoose();
+                    tagsTreeProvider.discardLoose();
                     cancelUri(undefined);
                 }
             }
@@ -476,92 +471,186 @@ export function activate(context: vscode.ExtensionContext): {
             reloadConfigDebounced("onDidChangeWorkspaceFolders")
         ),
         vscode.commands.registerCommand(commands.scanLanguageComments, async () => {
-            const decoder = new TextDecoder();
-            let content =
-                '{\n    // Tag Lens language comment token scan results\n    // User may copy and paste this to their global or workspace level configuration file\n    "commentTokens": {\n';
-            let notFirst = false;
-            for (const extension of vscode.extensions.all) {
-                const packageJSON = PackageJsonLanguageContributionSchema.safeParse(
-                    extension.packageJSON
-                );
-                if (!packageJSON.success) {
-                    continue;
-                }
-                for (const language of packageJSON.data.contributes.languages) {
-                    const languagePath = vscode.Uri.joinPath(
-                        extension.extensionUri,
-                        language.configuration
+            const discoveryPromise = getExtensionLanguageCommentTokens().then(
+                (discoveredTokens) => {
+                    const currentTokens = configuration.getCommentTokens();
+                    const languageIds = new Set([
+                        ...Object.keys(discoveredTokens),
+                        ...Object.keys(currentTokens),
+                    ]);
+                    const languages: Record<
+                        string,
+                        {
+                            current?: configuration.CommentTokens[string];
+                            discovered: configuration.CommentTokens;
+                        }
+                    > = Object.fromEntries(
+                        languageIds.entries().map(([languageId]) => [
+                            languageId,
+                            {
+                                current: currentTokens[languageId],
+                                discovered: discoveredTokens[languageId] ?? {},
+                            },
+                        ])
                     );
-                    let languageConfiguration: LanguageConfiguration | undefined;
-                    try {
-                        const fileBytes = await vscode.workspace.fs.readFile(languagePath);
-                        const fileString = decoder.decode(fileBytes);
-                        const fileObject = JSONC.parse(fileString);
-                        const validated = LanguageConfigurationSchema.safeParse(fileObject);
-                        if (validated.success) {
-                            languageConfiguration = validated.data;
-                        } else {
-                            continue;
-                        }
-                    } catch (_) {
-                        continue;
-                    }
-                    if (notFirst) {
-                        content += ",\n";
-                    } else {
-                        notFirst = true;
-                    }
-                    content += `        "${language.id}": {\n            // source extension: ${packageJSON.data.name}\n`;
-                    let lineCommentStart: string | undefined;
-                    if (languageConfiguration.comments.lineComment !== undefined) {
-                        content += '            "lineCommentStart": {\n';
-                        content += '                "literal": ';
-                        if (typeof languageConfiguration.comments.lineComment === "string") {
-                            content += JSON.stringify(languageConfiguration.comments.lineComment);
-                            lineCommentStart = languageConfiguration.comments.lineComment;
-                        } else if (languageConfiguration.comments.lineComment !== undefined) {
-                            content += JSON.stringify(
-                                languageConfiguration.comments.lineComment.comment
-                            );
-                            lineCommentStart = languageConfiguration.comments.lineComment.comment;
-                        }
-                        content += "\n            }";
-                    }
-                    if (languageConfiguration.comments.blockComment !== undefined) {
-                        if (lineCommentStart !== undefined) {
-                            content += ",\n";
-                            if (
-                                languageConfiguration.comments.blockComment.includes(
-                                    lineCommentStart
-                                )
-                            ) {
-                                content +=
-                                    "            // SUSPICIOUS: block comment token matches line comment token\n";
-                            }
-                        }
-                        content += '            "blockCommentStart": {\n';
-                        content += '                "literal": ';
-                        content += JSON.stringify(languageConfiguration.comments.blockComment[0]);
-                        content += "\n            },\n";
-                        content += '            "blockCommentEnd": {\n';
-                        content += '                "literal": ';
-                        content += JSON.stringify(languageConfiguration.comments.blockComment[1]);
-                        content += "\n            }\n";
-                    } else {
-                        content += "\n";
-                    }
-                    content += "        }";
+                    return languages;
                 }
-            }
-            content += "\n    }\n}\n";
-            const document = await vscode.workspace.openTextDocument({
-                language: "jsonc",
-                content,
-                encoding: "utf-8",
+            );
+            const { promise: readyPromise, resolve: readyResolve } = Promise.withResolvers<void>();
+            const panel = vscode.window.createWebviewPanel(
+                "tag-lens.commentTokens",
+                "Tag Lens: Comment Tokens",
+                vscode.ViewColumn.Active,
+                { enableScripts: true }
+            );
+            const panelMessageDisposable = panel.webview.onDidReceiveMessage(
+                (message: WebViewMessage) => {
+                    const todo = undefined;
+                    switch (message.type) {
+                        case "ready":
+                            readyResolve();
+                            break;
+                        case "commit":
+                            // TODO: apply the config built by the webview
+                            break;
+                        default:
+                            throw new Error(
+                                `${message.type} should not be called from the webview side`
+                            );
+                    }
+                }
+            );
+            panel.webview.html = `<html>
+                <head>
+                    <link rel="stylesheel" href="${panel.webview.asWebviewUri(
+                        vscode.Uri.joinPath(context.extensionUri, "dist", "codicons", "codicon.css")
+                    )}" id="vscode-codicon-stylesheet" />
+                    <script src="${panel.webview.asWebviewUri(
+                        vscode.Uri.joinPath(
+                            context.extensionUri,
+                            "dist",
+                            "webview",
+                            "commentTokens.js"
+                        )
+                    )}" type="module" defer></script>
+                    <link rel="stylesheet" href="${panel.webview.asWebviewUri(
+                        vscode.Uri.joinPath(
+                            context.extensionUri,
+                            "dist",
+                            "webview",
+                            "commentTokens.css"
+                        )
+                    )}" />
+                </head>
+                <body>
+                    <div id="root"></div>
+                </body>
+            </html>`;
+            let panelDisposed = false;
+            context.subscriptions.push({
+                dispose(): void {
+                    if (!panelDisposed) {
+                        panel.dispose();
+                        panelMessageDisposable.dispose();
+                        panelDisposed = true;
+                    }
+                },
             });
-            await vscode.window.showTextDocument(document);
+            const [languages] = await Promise.all([discoveryPromise, readyPromise]);
+            await panel.webview.postMessage({
+                type: "setConfig",
+                config: { languages },
+            });
+            // const panel = vscode.window.createWebviewPanel(
+            //     "tag-lens.commentTokens",
+            //     "Tag Lens: Comment Tokens",
+            //     vscode.ViewColumn.Active,
+            //     { enableScripts: true }
+            // );
+            // panel.webview.html = commentTokensTemplate({
+            //     script: panel.webview.asWebviewUri(
+            //         vscode.Uri.joinPath(context.extensionUri, "resources", "commentTokens.js")
+            //     ),
+            //     stylesheet: panel.webview.asWebviewUri(
+            //         vscode.Uri.joinPath(context.extensionUri, "resources", "commentTokens.css")
+            //     ),
+            //     codicon: panel.webview.asWebviewUri(
+            //         vscode.Uri.joinPath(context.extensionUri, "dist", "codicons", "codicon.css")
+            //     ),
+            //     languages,
+            // });
+            // let panelDisposed = false;
+            // const panelDisposable = {
+            //     dispose(): void {
+            //         if (!panelDisposed) {
+            //             panel.dispose();
+            //             panelDisposed = true;
+            //         }
+            //     },
+            // };
+            // context.subscriptions.push(
+            //     panelDisposable,
+            //     panel.webview.onDidReceiveMessage((e) => {
+            //         try {
+            //             const message = webViewDataSchema.parse(e);
+            //             const newCommentTags = Object.fromEntries(
+            //                 [...languageIds]
+            //                     .sort()
+            //                     .filter((languageId) => message.data[languageId] !== "remove")
+            //                     .map((languageId) => {
+            //                         const languageChoice = message.data[languageId];
+            //                         switch (languageChoice) {
+            //                             case "current":
+            //                                 return [
+            //                                     languageId,
+            //                                     languages[languageId].current ?? {},
+            //                                 ];
+            //                             case "custom": {
+            //                                 const lineCommentStart =
+            //                                     message.data[`${languageId}.lineCommentStart`];
+            //                                 const blockCommentStart =
+            //                                     message.data[`${languageId}.blockCommentStart`];
+            //                                 const blockCommentEnd =
+            //                                     message.data[`${languageId}.blockCommentEnd`];
+            //                                 return [
+            //                                     languageId,
+            //                                     {
+            //                                         lineCommentStart:
+            //                                             lineCommentStart === ""
+            //                                                 ? undefined
+            //                                                 : lineCommentStart,
+            //                                         blockCommentStart:
+            //                                             blockCommentStart === ""
+            //                                                 ? undefined
+            //                                                 : blockCommentStart,
+            //                                         blockCommentEnd:
+            //                                             blockCommentEnd === ""
+            //                                                 ? undefined
+            //                                                 : blockCommentEnd,
+            //                                     },
+            //                                 ];
+            //                             }
+            //                             default:
+            //                                 return [
+            //                                     languageId,
+            //                                     languages[languageId].discovered[
+            //                                         message.data[languageId]
+            //                                     ],
+            //                                 ];
+            //                         }
+            //                     })
+            //             );
+            //             configuration.updateCommentTokens(
+            //                 newCommentTags,
+            //                 vscode.ConfigurationTarget.Global
+            //             );
+            //         } finally {
+            //             panelDisposable.dispose();
+            //         }
+            //     })
+            // );
         }),
-        vscode.workspace.onDidChangeWorkspaceFolders(treeProvider.onDidChangeWorkspaceFolders),
+        vscode.workspace.onDidChangeWorkspaceFolders(tagsTreeProvider.onDidChangeWorkspaceFolders),
         reloadProvidersEmitter.event(() => {
             layeredConfig.invalidateCache();
             kickOffScan().catch((err) =>
@@ -571,7 +660,8 @@ export function activate(context: vscode.ExtensionContext): {
         reloadProvidersEmitter,
         globalConfigWatcher,
         workspaceConfigWatcher,
-        treeView
+        tagsTreeView,
+        sourcesTreeView
     );
     return {
         contributeNamespace(

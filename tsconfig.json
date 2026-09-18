@@ -11,5 +11,6 @@
         },
         "strict": true
     },
-    "include": ["src", "generated"]
+    "include": ["src", "generated"],
+    "exclude": ["src/webview"]
 }
