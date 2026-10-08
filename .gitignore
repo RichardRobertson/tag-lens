@@ -5,3 +5,4 @@ node_modules
 *.vsix
 generated
 schema
+src/i18n/i18n-*

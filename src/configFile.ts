@@ -458,8 +458,7 @@ function hydrateConfig(
         return merged;
     }
     let processed = 0;
-    for (let i = 0; i < queue.length; i++) {
-        const key = queue[i];
+    for (const key of queue) {
         processed++;
         const tagGroup = config.tagGroups.get(key);
         assert(tagGroup !== undefined);

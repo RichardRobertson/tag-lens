@@ -1,8 +1,8 @@
 import * as JSONC from "jsonc-parser";
 import * as vscode from "vscode";
 import z from "zod";
-import { reorderKeys } from "./util";
-import type { CommentTokens } from "./webviewMessage";
+import { getOrInit, reorderKeys } from "./util";
+import type { PartialDiscoveredCommentTokens } from "./webviewMessage";
 
 const packageJsonLanguageContributionSchema = z.looseObject({
     name: z.string(),
@@ -12,7 +12,6 @@ const packageJsonLanguageContributionSchema = z.looseObject({
             z.looseObject({
                 id: z.string(),
                 configuration: z.string().optional(),
-                aliases: z.array(z.string()).optional(),
             })
         ),
     }),
@@ -33,10 +32,10 @@ const languageConfigurationSchema = z.looseObject({
 });
 
 export async function getExtensionLanguageCommentTokens(): Promise<
-    Record<string, Record<string, CommentTokens>>
+    Record<string, Record<string, PartialDiscoveredCommentTokens>>
 > {
     const decoder = new TextDecoder();
-    const result: Record<string, Record<string, CommentTokens>> = {};
+    const result: Record<string, Record<string, PartialDiscoveredCommentTokens>> = {};
     for (const extension of vscode.extensions.all) {
         const packageJSON = packageJsonLanguageContributionSchema.safeParse(extension.packageJSON);
         if (!packageJSON.success) {
@@ -64,27 +63,20 @@ export async function getExtensionLanguageCommentTokens(): Promise<
             } catch {
                 continue;
             }
-            if (result[language.id] === undefined) {
-                result[language.id] = {};
-            }
-            result[language.id][extension.id] = {
-                aliases: language.aliases,
+            const sources = getOrInit(result, language.id, () => ({}));
+            const source = getOrInit(sources, extension.id, () => ({
                 displayName: packageJSON.data.displayName,
-            };
+            }));
             if (languageConfiguration.comments.lineComment !== undefined) {
                 if (typeof languageConfiguration.comments.lineComment === "string") {
-                    result[language.id][extension.id].lineCommentStart =
-                        languageConfiguration.comments.lineComment;
+                    source.lineCommentStart = languageConfiguration.comments.lineComment;
                 } else if (languageConfiguration.comments.lineComment !== undefined) {
-                    result[language.id][extension.id].lineCommentStart =
-                        languageConfiguration.comments.lineComment.comment;
+                    source.lineCommentStart = languageConfiguration.comments.lineComment.comment;
                 }
             }
             if (languageConfiguration.comments.blockComment !== undefined) {
-                [
-                    result[language.id][extension.id].blockCommentStart,
-                    result[language.id][extension.id].blockCommentEnd,
-                ] = languageConfiguration.comments.blockComment;
+                [source.blockCommentStart, source.blockCommentEnd] =
+                    languageConfiguration.comments.blockComment;
             }
         }
     }

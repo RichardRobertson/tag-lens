@@ -1,5 +1,6 @@
 import assert from "node:assert";
 import type { RE2JS } from "re2js";
+import type * as vscode from "vscode";
 
 export function resolveTemplate(template: string, match: RegExpExecArray): string {
     const groups = match.groups ?? {};
@@ -25,7 +26,7 @@ export function resolveTemplate(template: string, match: RegExpExecArray): strin
     });
 }
 
-export function* concatIterables<T>(...iterables: Iterable<T>[]): IterableIterator<T> {
+export function* concatIterables<T>(...iterables: Iterable<T>[]): Generator<T> {
     for (const iterable of iterables) {
         yield* iterable;
     }
@@ -92,4 +93,61 @@ export function reorderKeys<T>(
             .sort(([a], [b]) => (a < b ? -1 : 1))
             .map(([key, value]) => [key, valueMap(value)])
     );
+}
+
+export function getOrInit<R, K extends keyof R>(
+    container: R,
+    key: K,
+    init: () => NonNullable<R[K]>
+): R[K] {
+    let value = container[key];
+    if (value === undefined) {
+        value = init();
+        container[key] = value;
+    }
+    return value;
+}
+
+export function* zipExact<A, B>(a: Iterable<A>, b: Iterable<B>): Generator<[A, B]> {
+    const ai = a[Symbol.iterator]();
+    const bi = b[Symbol.iterator]();
+    while (true) {
+        const ar = ai.next();
+        const br = bi.next();
+        if (ar.done || br.done) {
+            if (ar.done !== br.done) {
+                throw new Error("Iterables have different lengths");
+            }
+            return;
+        }
+        yield [ar.value, br.value];
+    }
+}
+
+export class CompositeDisposable implements vscode.Disposable {
+    private disposed = false;
+    private disposables: vscode.Disposable[] = [];
+
+    push(...disposables: vscode.Disposable[]): void {
+        if (this.disposed) {
+            CompositeDisposable.disposeOf(...disposables);
+            return;
+        }
+        this.disposables.push(...disposables);
+    }
+
+    dispose(): void {
+        if (this.disposed) {
+            return;
+        }
+        this.disposed = true;
+        CompositeDisposable.disposeOf(...this.disposables);
+        this.disposables.length = 0;
+    }
+
+    private static disposeOf(...disposables: vscode.Disposable[]): void {
+        for (const disposable of disposables.toReversed()) {
+            disposable.dispose();
+        }
+    }
 }

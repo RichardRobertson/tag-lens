@@ -5,7 +5,7 @@
     "tasks": [
         {
             "label": "watch",
-            "dependsOn": ["npm: watch:tsc", "npm: watch:esbuild"],
+            "dependsOn": ["npm: watch:tsc", "npm: watch:esbuild", "npm: typesafe-i18n"],
             "presentation": {
                 "reveal": "never"
             },
@@ -80,6 +80,26 @@
             "label": "tasks: watch-tests",
             "dependsOn": ["npm: watch", "npm: watch-tests"],
             "problemMatcher": []
+        },
+        {
+            "type": "npm",
+            "script": "typesafe-i18n",
+            "label": "npm: typesafe-i18n",
+            "isBackground": true,
+            "problemMatcher": {
+                "pattern": {
+                    "regexp": "^$"
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "^\\[typesafe-i18n\\] watcher started in:",
+                    "endsPattern": "^\\[typesafe-i18n\\] \\.\\.\\. all files are up to date$"
+                }
+            },
+            "presentation": {
+                "reveal": "never",
+                "group": "watch"
+            }
         }
     ]
 }

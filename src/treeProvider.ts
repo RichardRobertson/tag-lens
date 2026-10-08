@@ -5,7 +5,7 @@ import * as configuration from "@generated/configuration";
 import * as vscode from "vscode";
 import type { Tag } from "./configFile";
 import { openTagLinkCommand } from "./extension";
-import { resolveTemplate, trace } from "./util";
+import { resolveTemplate } from "./util";
 
 interface WorkspaceNode {
     type: "workspace";
@@ -89,7 +89,8 @@ abstract class NodeWrapper<N extends Node> {
             return undefined;
         }
         const compactFullPath = [...this.compactFullPath()];
-        const secondLast = compactFullPath[compactFullPath.length - 2];
+        const secondLast = compactFullPath.at(-2);
+        assert(secondLast !== undefined);
         if (Array.isArray(secondLast)) {
             return secondLast.map((node) => node.uriString);
         } else {
@@ -102,7 +103,8 @@ abstract class NodeWrapper<N extends Node> {
             return this.uriString;
         }
         const compactFullPath = [...this.compactFullPath()];
-        const last = compactFullPath[compactFullPath.length - 1];
+        const last = compactFullPath.at(-1);
+        assert(last !== undefined);
         if (Array.isArray(last)) {
             return last.map((node) => node.uriString);
         } else {
@@ -350,13 +352,13 @@ export class TagsTreeProvider implements vscode.TreeDataProvider<string> {
     onDidChangeTreeData = this.emitOnDidChangeTreeData.event;
 
     getTreeItem(elementString: string): vscode.TreeItem | Thenable<vscode.TreeItem> {
-        // trace({ id: "treeProvider.getChildren", element });
         const element: ProjectedNode = JSON.parse(elementString);
         try {
             const elementUriString =
                 element.type === "real"
                     ? element.uriString
                     : element.uriStrings[element.uriStrings.length - 1];
+            assert(elementUriString !== undefined);
             const node = this.nodeMap.get(elementUriString);
             if (node === undefined) {
                 throw new Error(`Unknown node key ${JSON.stringify(element)}`);
@@ -415,7 +417,6 @@ export class TagsTreeProvider implements vscode.TreeDataProvider<string> {
     }
 
     getChildren(elementString?: string): vscode.ProviderResult<string[]> {
-        // trace({ id: "treeProvider.getChildren", element });
         const element: ProjectedNode | undefined =
             elementString === undefined ? undefined : JSON.parse(elementString);
         if (element === undefined) {
@@ -431,6 +432,7 @@ export class TagsTreeProvider implements vscode.TreeDataProvider<string> {
             element.type === "real"
                 ? element.uriString
                 : element.uriStrings[element.uriStrings.length - 1];
+        assert(elementUriString !== undefined);
         const node = this.nodeMap.get(elementUriString);
         if (node === undefined || node.type === "range") {
             return undefined;
@@ -475,6 +477,7 @@ export class TagsTreeProvider implements vscode.TreeDataProvider<string> {
         const element: ProjectedNode = JSON.parse(elementString);
         const elementUriString =
             element.type === "real" ? element.uriString : element.uriStrings[0];
+        assert(elementUriString !== undefined);
         if (!this.nodeMap.has(elementUriString)) {
             return undefined;
         }
@@ -539,7 +542,6 @@ export class TagsTreeProvider implements vscode.TreeDataProvider<string> {
             });
         }
         const uriString = uri.toString(true);
-        // trace({ id: "treeProvider.setFileMatches", uriString });
         const [parentUriString, parentNode, notifyRootUriString] = this.ensurePath(uri);
         parentNode.children.push(uriString);
         const newNode: FsNode = {
@@ -668,10 +670,13 @@ export class TagsTreeProvider implements vscode.TreeDataProvider<string> {
         let currentUriString = currentUri.toString(true);
         let currentNode: WorkspaceNode | FsNode = workspaceNode;
         let notifyRootUriString: string | undefined;
-        for (let i = 0; i < relativeSteps.length - 1; i++) {
+        for (const [i, relativeStep] of relativeSteps.entries()) {
+            if (i === relativeSteps.length - 1) {
+                break;
+            }
             const previousUriString = currentUriString;
             const previousNode = currentNode as WorkspaceNode | FsNode;
-            currentUri = vscode.Uri.joinPath(currentUri, relativeSteps[i]);
+            currentUri = vscode.Uri.joinPath(currentUri, relativeStep);
             currentUriString = currentUri.toString(true);
             const nextNode = this.nodeMap.get(currentUriString);
             if (nextNode === undefined) {
@@ -816,11 +821,6 @@ export class TagsTreeProvider implements vscode.TreeDataProvider<string> {
     }
 
     fireOnDidChangeTreeData(element?: ProjectedNode): void {
-        // trace({
-        //     id: "treeProvider.onDidChangeTreeData",
-        //     element,
-        //     stack: new Error().stack,
-        // });
         this.emitOnDidChangeTreeData.fire(
             element === undefined ? undefined : JSON.stringify(element)
         );

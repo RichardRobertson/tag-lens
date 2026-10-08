@@ -9,6 +9,7 @@
         "paths": {
             "@generated/*": ["./generated/*"]
         },
+        "noUncheckedIndexedAccess": true,
         "strict": true
     },
     "include": ["src", "generated"],

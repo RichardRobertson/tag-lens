@@ -57,7 +57,7 @@ async function main(): Promise<void> {
             sourcemap: !production,
             sourcesContent: false,
             platform: "browser",
-            outfile: "dist/webview/commentTokens.js",
+            outdir: "dist/webview",
             logLevel: "silent",
             plugins: [esbuildProblemMatcherPlugin],
         }),

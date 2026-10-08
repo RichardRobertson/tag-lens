@@ -2,7 +2,7 @@ import PQueue from "p-queue";
 import * as vscode from "vscode";
 import { type HydratedConfig, LayeredConfig } from "./configFile";
 import type { TagMatch } from "./treeProvider";
-import { concatIterables, re2jsMatchAllWithIndices } from "./util";
+import { concatIterables, re2jsMatchAllWithIndices, zipExact } from "./util";
 
 const fileQueue2: PQueue = new PQueue({ concurrency: 10 });
 
@@ -155,18 +155,18 @@ async function processFile(
             let valid = false;
             if (startIndices.length === endIndices.length) {
                 valid = true;
-                for (let i = 0; i < startIndices.length; i++) {
-                    if (startIndices[i] > endIndices[i]) {
+                for (const [start, end] of zipExact(startIndices, endIndices)) {
+                    if (start > end) {
                         valid = false;
                         break;
                     }
                 }
             }
             if (valid) {
-                for (let i = 0; i < startIndices.length; i += 2) {
+                for (const [start, end] of zipExact(startIndices, endIndices)) {
                     commentSpans.push({
-                        start: startIndices[i],
-                        end: endIndices[i],
+                        start,
+                        end,
                     });
                 }
             }

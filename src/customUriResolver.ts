@@ -134,14 +134,17 @@ abstract class ResolvableBase {
         });
     }
 
-    private static readonly replacements: Record<string, string> = {
+    private static readonly replacements: Record<"#" | "%" | "?", string> = {
         "#": "%23",
         "%": "%25",
         "?": "%3F",
     };
 
     private static minimalEncodeURIComponent(value: string): string {
-        return value.replace(/[#%?]/, (char) => ResolvableBase.replacements[char]);
+        return value.replace(
+            /[#%?]/,
+            (char) => ResolvableBase.replacements[char as "#" | "%" | "?"]
+        );
     }
 
     static getContribution(uri: vscode.Uri): {

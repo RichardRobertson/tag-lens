@@ -1,13 +1,13 @@
-// import "baukasten-ui/dist/baukasten-base.css";
-// import "baukasten-ui/dist/baukasten-vscode.css";
 import "./commentTokens.css";
 
 import "@vscode-elements/elements/dist/vscode-badge";
+import "@vscode-elements/elements/dist/vscode-button";
+import "@vscode-elements/elements/dist/vscode-button-group";
 import "@vscode-elements/elements/dist/vscode-divider";
 import "@vscode-elements/elements/dist/vscode-icon";
 import "@vscode-elements/elements/dist/vscode-form-group";
 import "@vscode-elements/elements/dist/vscode-form-helper";
-import "@vscode-elements/elements/dist/vscode-scrollable";
+import "@vscode-elements/elements/dist/vscode-progress-ring";
 import "@vscode-elements/elements/dist/vscode-split-layout";
 import "@vscode-elements/elements/dist/vscode-textfield";
 import type { VscodeTextfield } from "@vscode-elements/elements/dist/vscode-textfield";
@@ -16,418 +16,697 @@ import type { VscTreeSelectEvent } from "@vscode-elements/elements/dist/vscode-t
 import "@vscode-elements/elements/dist/vscode-tree-item";
 import type { VscodeTreeItem } from "@vscode-elements/elements/dist/vscode-tree-item";
 
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { ErrorBoundary, type FallbackProps, getErrorMessage } from "react-error-boundary";
-import type { WebViewConfig, WebViewMessage } from "../webviewMessage";
 
-const vscode = acquireVsCodeApi<WebViewConfig>();
+import { useI18nContext } from "../i18n/i18n-react";
 
-// interface TokenSuggestionProps {
-//     value?: string;
-// }
+import {
+    type CommentTokens,
+    type DiscoveredCommentTokens,
+    enumContainsFlag,
+    type FromWebView,
+    isDefinedAndNonEmpty,
+    type PartialCommentTokens,
+    type PartialDiscoveredCommentTokens,
+    TokenWarnings,
+    ToWebView,
+    validateCommentTokens,
+} from "../webviewMessage";
+import { I18nRoot } from "./i18nRoot";
+import { Root } from "./root";
+import { Spinner } from "./spinner";
 
-// function TokenSuggestion({ value }: TokenSuggestionProps): React.JSX.Element {
-//     if (value === undefined) {
-//         return <span style={{ color: "var(--bk-color-foreground-disabled)" }}>(unset)</span>;
-//     } else {
-//         return <code>{value}</code>;
-//     }
-// }
-
-// interface SuggestionProps {
-//     source: string;
-//     tokens: CommentTokens;
-//     checked?: boolean;
-//     icon: CodiconName;
-// }
-
-// function Suggestion({ source, tokens, checked, icon }: SuggestionProps): React.JSX.Element {
-//     return (
-//         <tr>
-//             <td>
-//                 <Radio value={source} checked={checked} />
-//             </td>
-//             <td>
-//                 <Icon name={icon} />
-//                 {source}
-//             </td>
-//             <td>
-//                 <TokenSuggestion value={tokens.lineCommentStart} />
-//             </td>
-//             <td>
-//                 <TokenSuggestion value={tokens.blockCommentStart} />
-//             </td>
-//             <td>
-//                 <TokenSuggestion value={tokens.blockCommentEnd} />
-//             </td>
-//         </tr>
-//     );
-// }
-
-// interface LanguageProps {
-//     language: string;
-//     current: CommentTokens;
-//     discovered: Record<string, CommentTokens>;
-// }
-
-// function Language({ language, current, discovered }: LanguageProps): React.JSX.Element {
-//     let checked = false;
-//     function getFirstChecked(): boolean {
-//         if (checked) {
-//             return false;
-//         }
-//         checked = true;
-//         return true;
-//     }
-//     return (
-//         <tbody>
-//             <tr>
-//                 <th colSpan={5}>{language}</th>
-//             </tr>
-//             <RadioGroup name={language}>
-//                 {current !== undefined && (
-//                     <Suggestion
-//                         key={"current"}
-//                         source={"current"}
-//                         checked={getFirstChecked()}
-//                         icon={"settings"}
-//                         tokens={current}
-//                     />
-//                 )}
-//                 {Object.entries(discovered ?? {}).map(([source, tokens]) => (
-//                     <Suggestion
-//                         key={source}
-//                         source={source}
-//                         icon={"sparkle"}
-//                         tokens={tokens}
-//                         checked={getFirstChecked()}
-//                     />
-//                 ))}
-//             </RadioGroup>
-//         </tbody>
-//     );
-// }
-
-enum TokenWarnings {
-    None = 0,
-    lineStartMatchesBlockStart = 1,
-    lineStartMatchesBlockEnd = 2,
-    blockStartEmpty = 4,
-    blockEndEmpty = 8,
+interface WebViewState {
+    state: "loading" | "ready";
+    baselineConfig: Record<string, PartialCommentTokens>;
+    discovered: Record<string, Record<string, DiscoveredCommentTokens>>;
+    editing: Record<string, CommentTokens>;
+    searchValue: string;
+    leftScrollPos: number;
+    rightScrollPos: number;
 }
 
-function App(): React.JSX.Element {
-    const [config, setConfig] = useState(vscode.getState());
+const vscode = acquireVsCodeApi<WebViewState>();
+
+interface TokenSuggestionProps {
+    value?: string;
+}
+
+function TokenSuggestion({ value }: TokenSuggestionProps): React.JSX.Element {
+    if (isDefinedAndNonEmpty(value)) {
+        return (
+            <code>
+                {value
+                    .replaceAll(" ", "\u2420")
+                    .replaceAll("\t", "\u2409")
+                    .replaceAll("\n", "\u240a")
+                    .replaceAll("\r", "\u240d")}
+            </code>
+        );
+    } else {
+        return <span style={{ color: "var(--vscode-disabledForeground)" }}>(unset)</span>;
+    }
+}
+
+type ScrollableProps = React.ComponentProps<"div">;
+
+function Scrollable({ ref, children, style, ...props }: ScrollableProps): React.JSX.Element {
+    return (
+        <div
+            ref={ref}
+            {...props}
+            style={{
+                overflow: "auto",
+                ...style,
+            }}
+        >
+            {children}
+        </div>
+    );
+}
+
+function stringEffectivelyEqual(a: string | undefined, b: string | undefined): boolean {
+    return (a ?? "") === (b ?? "");
+}
+
+interface WarningsListProps {
+    warnings: TokenWarnings;
+}
+
+function WarningsList({ warnings }: WarningsListProps): React.JSX.Element | null {
+    const { LL } = useI18nContext();
+    if (warnings === TokenWarnings.None) {
+        return null;
+    }
+    const warningStrings: [TokenWarnings, string][] = [];
+    if (enumContainsFlag(warnings, TokenWarnings.LineStartMatchesBlockStart)) {
+        warningStrings.push([
+            TokenWarnings.LineStartMatchesBlockStart,
+            LL.TokenWarnings.LineStartMatchesBlockStart(),
+        ]);
+    }
+    if (enumContainsFlag(warnings, TokenWarnings.LineStartMatchesBlockEnd)) {
+        warningStrings.push([
+            TokenWarnings.LineStartMatchesBlockEnd,
+            LL.TokenWarnings.LineStartMatchesBlockEnd(),
+        ]);
+    }
+    if (enumContainsFlag(warnings, TokenWarnings.BlockStartEmpty)) {
+        warningStrings.push([TokenWarnings.BlockStartEmpty, LL.TokenWarnings.BlockStartEmpty()]);
+    }
+    if (enumContainsFlag(warnings, TokenWarnings.BlockEndEmpty)) {
+        warningStrings.push([TokenWarnings.BlockEndEmpty, LL.TokenWarnings.BlockEndEmpty()]);
+    }
+    if (enumContainsFlag(warnings, TokenWarnings.AllEmpty)) {
+        warningStrings.push([TokenWarnings.AllEmpty, LL.TokenWarnings.AllEmpty()]);
+    }
+    return (
+        <ul className="warning">
+            {warningStrings.map(([key, text]) => (
+                <li key={key}>{text}</li>
+            ))}
+        </ul>
+    );
+}
+
+interface LanguageEditorProps {
+    languageId: string;
+    baseline?: PartialCommentTokens;
+    editing: CommentTokens;
+    discovered?: Record<string, DiscoveredCommentTokens>;
+    onChange(value: CommentTokens): void;
+}
+
+function LanguageEditor({
+    languageId,
+    baseline,
+    editing,
+    discovered,
+    onChange,
+}: LanguageEditorProps): React.JSX.Element {
+    const { LL } = useI18nContext();
+    const warnings = validateCommentTokens(editing);
+    const warnLineStart: TokenWarnings =
+        warnings &
+        (TokenWarnings.LineStartMatchesBlockStart | TokenWarnings.LineStartMatchesBlockEnd);
+    const warnBlockStart: TokenWarnings =
+        warnings & (TokenWarnings.LineStartMatchesBlockStart | TokenWarnings.BlockStartEmpty);
+    const warnBlockEnd: TokenWarnings =
+        warnings & (TokenWarnings.LineStartMatchesBlockEnd | TokenWarnings.BlockEndEmpty);
+    return (
+        <>
+            <div className="config-header">{languageId}</div>
+            {discovered !== undefined &&
+                Object.entries(discovered).map(([extensionId, tokens]) => {
+                    return (
+                        <vscode-form-group variant="settings-group" key={extensionId}>
+                            <vscode-label htmlFor={`${extensionId}:${languageId}`}>
+                                {tokens.displayName === undefined
+                                    ? `<${extensionId}>`
+                                    : `${tokens.displayName} <${extensionId}>`}
+                            </vscode-label>
+                            <vscode-form-helper>
+                                <p>
+                                    <span className="pair">
+                                        {LL.CommentTokens.LanguageEditor.Discovered.LineStart()}{" "}
+                                        <TokenSuggestion value={tokens.lineCommentStart} />
+                                    </span>{" "}
+                                    <span className="pair">
+                                        {LL.CommentTokens.LanguageEditor.Discovered.BlockStart()}{" "}
+                                        <TokenSuggestion value={tokens.blockCommentStart} />
+                                    </span>{" "}
+                                    <span className="pair">
+                                        {LL.CommentTokens.LanguageEditor.Discovered.BlockEnd()}{" "}
+                                        <TokenSuggestion value={tokens.blockCommentEnd} />
+                                    </span>
+                                </p>
+                                <WarningsList warnings={validateCommentTokens(tokens)} />
+                            </vscode-form-helper>
+                            <vscode-button
+                                id={`${extensionId}:${languageId}`}
+                                onClick={() =>
+                                    onChange({
+                                        lineCommentStart: tokens.lineCommentStart ?? "",
+                                        blockCommentStart: tokens.blockCommentStart ?? "",
+                                        blockCommentEnd: tokens.blockCommentEnd ?? "",
+                                    })
+                                }
+                            >
+                                {LL.CommentTokens.LanguageEditor.Discovered.Use()}
+                            </vscode-button>
+                        </vscode-form-group>
+                    );
+                })}
+            <vscode-form-group variant="settings-group">
+                <vscode-label htmlFor={`${languageId}-lineStart`}>
+                    {LL.CommentTokens.LanguageEditor.LineStart()}
+                </vscode-label>
+                {warnLineStart !== TokenWarnings.None && (
+                    <vscode-form-helper>
+                        <WarningsList warnings={warnLineStart} />
+                    </vscode-form-helper>
+                )}
+                <vscode-textfield
+                    id={`${languageId}-lineStart`}
+                    placeholder="(unset)"
+                    value={editing?.lineCommentStart}
+                    className="mono"
+                    invalid={warnLineStart !== TokenWarnings.None}
+                    onInput={(e: React.InputEvent<VscodeTextfield>) =>
+                        onChange({
+                            ...editing,
+                            lineCommentStart: e.currentTarget.value,
+                        })
+                    }
+                >
+                    {baseline !== undefined &&
+                        editing !== undefined &&
+                        !stringEffectivelyEqual(
+                            baseline.lineCommentStart,
+                            editing.lineCommentStart
+                        ) && (
+                            <vscode-icon
+                                slot="content-after"
+                                name="discard"
+                                actionIcon
+                                onClick={() =>
+                                    onChange({
+                                        ...editing,
+                                        lineCommentStart: baseline?.lineCommentStart ?? "",
+                                    })
+                                }
+                            />
+                        )}
+                </vscode-textfield>
+            </vscode-form-group>
+            <vscode-form-group variant="settings-group">
+                <vscode-label htmlFor={`${languageId}-blockStart`}>
+                    {LL.CommentTokens.LanguageEditor.BlockStart()}
+                </vscode-label>
+                {warnBlockStart !== TokenWarnings.None && (
+                    <vscode-form-helper>
+                        <WarningsList warnings={warnBlockStart} />
+                    </vscode-form-helper>
+                )}
+                <vscode-textfield
+                    id={`${languageId}-blockStart`}
+                    placeholder="(unset)"
+                    value={editing?.blockCommentStart}
+                    className="mono"
+                    invalid={warnBlockStart !== TokenWarnings.None}
+                    required={editing.blockCommentEnd !== ""}
+                    onInput={(e: React.InputEvent<VscodeTextfield>) =>
+                        onChange({
+                            ...editing,
+                            blockCommentStart: e.currentTarget.value,
+                        })
+                    }
+                >
+                    {baseline !== undefined &&
+                        !stringEffectivelyEqual(
+                            baseline.blockCommentStart,
+                            editing.blockCommentStart
+                        ) && (
+                            <vscode-icon
+                                slot="content-after"
+                                name="discard"
+                                actionIcon
+                                onClick={() =>
+                                    onChange({
+                                        ...editing,
+                                        blockCommentStart: baseline?.blockCommentStart ?? "",
+                                    })
+                                }
+                            />
+                        )}
+                </vscode-textfield>
+            </vscode-form-group>
+            <vscode-form-group variant="settings-group">
+                <vscode-label htmlFor={`${languageId}-blockEnd`}>
+                    {LL.CommentTokens.LanguageEditor.BlockEnd()}
+                </vscode-label>
+                {warnBlockEnd !== TokenWarnings.None && (
+                    <vscode-form-helper>
+                        <WarningsList warnings={warnBlockEnd} />
+                    </vscode-form-helper>
+                )}
+                <vscode-textfield
+                    id={`${languageId}-blockEnd`}
+                    placeholder="(unset)"
+                    value={editing?.blockCommentEnd}
+                    className="mono"
+                    invalid={warnBlockEnd !== TokenWarnings.None}
+                    required={editing.blockCommentStart !== ""}
+                    onInput={(e: React.InputEvent<VscodeTextfield>) =>
+                        onChange({
+                            ...editing,
+                            blockCommentEnd: e.currentTarget.value,
+                        })
+                    }
+                >
+                    {baseline !== undefined &&
+                        editing !== undefined &&
+                        !stringEffectivelyEqual(
+                            baseline.blockCommentEnd,
+                            editing.blockCommentEnd
+                        ) && (
+                            <vscode-icon
+                                slot="content-after"
+                                name="discard"
+                                actionIcon
+                                onClick={() =>
+                                    onChange({
+                                        ...editing,
+                                        blockCommentEnd: baseline?.blockCommentEnd ?? "",
+                                    })
+                                }
+                            />
+                        )}
+                </vscode-textfield>
+            </vscode-form-group>
+        </>
+    );
+}
+
+function getWarningsCount(editing: CommentTokens): number {
+    let count = 0;
+    const warnings = validateCommentTokens(editing);
+    if (enumContainsFlag(warnings, TokenWarnings.LineStartMatchesBlockStart)) {
+        count++;
+    }
+    if (enumContainsFlag(warnings, TokenWarnings.LineStartMatchesBlockEnd)) {
+        count++;
+    }
+    if (enumContainsFlag(warnings, TokenWarnings.BlockStartEmpty)) {
+        count++;
+    }
+    if (enumContainsFlag(warnings, TokenWarnings.BlockEndEmpty)) {
+        count++;
+    }
+    if (enumContainsFlag(warnings, TokenWarnings.AllEmpty)) {
+        count++;
+    }
+    return count;
+}
+
+function normalizeConfig(
+    baselineConfig: Record<string, PartialCommentTokens>,
+    discovered: Record<string, Record<string, PartialDiscoveredCommentTokens>>
+): {
+    baselineConfig: Record<string, CommentTokens>;
+    discovered: Record<string, Record<string, DiscoveredCommentTokens>>;
+    editing: Record<string, CommentTokens>;
+} {
+    function normalizeTokens(tokens: PartialCommentTokens): CommentTokens;
+    function normalizeTokens(tokens: PartialDiscoveredCommentTokens): DiscoveredCommentTokens;
+    function normalizeTokens(
+        tokens: PartialCommentTokens | PartialDiscoveredCommentTokens
+    ): CommentTokens | DiscoveredCommentTokens {
+        if ("displayName" in tokens) {
+            return {
+                lineCommentStart: tokens.lineCommentStart ?? "",
+                blockCommentStart: tokens.blockCommentStart ?? "",
+                blockCommentEnd: tokens.blockCommentEnd ?? "",
+                displayName: tokens.displayName,
+            };
+        }
+        return {
+            lineCommentStart: tokens.lineCommentStart ?? "",
+            blockCommentStart: tokens.blockCommentStart ?? "",
+            blockCommentEnd: tokens.blockCommentEnd ?? "",
+        };
+    }
+    const normalizedBaseline = Object.fromEntries(
+        Object.entries(baselineConfig).map(([languageId, tokens]) => [
+            languageId,
+            normalizeTokens(tokens),
+        ])
+    );
+    const normalizedDiscovered = Object.fromEntries(
+        Object.entries(discovered).map(([languageId, sources]) => [
+            languageId,
+            Object.fromEntries(
+                Object.entries(sources).map(([extensionId, tokens]) => [
+                    extensionId,
+                    normalizeTokens(tokens),
+                ])
+            ),
+        ])
+    );
+    const editing = Object.fromEntries([
+        ...Object.entries(normalizedDiscovered).map(([languageId]) => [
+            languageId,
+            { lineCommentStart: "", blockCommentStart: "", blockCommentEnd: "" },
+        ]),
+        ...Object.entries(normalizedBaseline).map(([languageId, tokens]) => [
+            languageId,
+            { ...tokens },
+        ]),
+    ]);
+    return {
+        baselineConfig: normalizedBaseline,
+        discovered: normalizedDiscovered,
+        editing,
+    };
+}
+
+export function App(): React.JSX.Element {
+    const { LL } = useI18nContext();
+    const [appState, setAppState] = useState(() => {
+        const state = vscode.getState() || {
+            state: "loading",
+            baselineConfig: {},
+            discovered: {},
+            editing: {},
+            leftScrollPos: 0,
+            rightScrollPos: 0,
+            searchValue: "",
+        };
+        return state;
+    });
     useEffect(() => {
-        vscode.setState(config);
-    }, [config]);
+        vscode.setState(appState);
+    }, [appState]);
     useEffect(() => {
-        const listener = (event: MessageEvent<WebViewMessage>): void => {
-            const message = event.data;
-            switch (message.type) {
+        const listener = (event: MessageEvent<ToWebView.Message>): void => {
+            const parsedMessage = ToWebView.Message.parse(event.data);
+            switch (parsedMessage.type) {
                 case "setConfig":
-                    setConfig(message.config);
+                    setAppState({
+                        ...normalizeConfig(parsedMessage.baselineConfig, parsedMessage.discovered),
+                        state: "ready",
+                        searchValue: "",
+                        leftScrollPos: 0,
+                        rightScrollPos: 0,
+                    });
                     break;
-                default:
-                    throw new Error(`${message.type} should not be called from the extension side`);
             }
         };
         window.addEventListener("message", listener);
-        vscode.postMessage({ type: "ready" });
+        vscode.postMessage({ type: "ready" } satisfies FromWebView.Message);
         return () => {
             window.removeEventListener("message", listener);
         };
     }, []);
-    const [searchValue, setSearchValue] = useState("");
-    useEffect(() => {
-        const handleKeyDown = (event: KeyboardEvent): void => {
-            if (event.key === "Escape") {
-                setSearchValue("");
+    const leftScrollableRef = useRef<HTMLDivElement>(null);
+    useLayoutEffect(() => {
+        if (appState.state === "loading" || appState.leftScrollPos === 0) {
+            return;
+        }
+        const frame = requestAnimationFrame(() => {
+            const scrollable = leftScrollableRef.current;
+            if (scrollable !== null) {
+                scrollable.scrollTop = appState.leftScrollPos;
             }
-        };
-        window.addEventListener("keydown", handleKeyDown);
-        return () => {
-            window.removeEventListener("keydown", handleKeyDown);
-        };
-    }, []);
+        });
+        return () => cancelAnimationFrame(frame);
+    }, [appState]);
+    const rightScrollableRef = useRef<HTMLDivElement>(null);
+    useLayoutEffect(() => {
+        if (appState.state === "loading" || appState.rightScrollPos === 0) {
+            return;
+        }
+        const frame = requestAnimationFrame(() => {
+            const scrollable = rightScrollableRef.current;
+            if (scrollable !== null) {
+                scrollable.scrollTop = appState.rightScrollPos;
+            }
+        });
+        return () => cancelAnimationFrame(frame);
+    }, [appState]);
     const itemRefs = useRef(new Map<string, HTMLDivElement>());
+    const pendingHighlightRef = useRef<HTMLDivElement>(null);
     function scrollToItem(key: string): void {
+        const scrollable = rightScrollableRef.current;
+        if (scrollable === null) {
+            return;
+        }
         const map = itemRefs.current;
         const node = map.get(key);
         if (node !== undefined) {
             node.classList.remove("highlight");
+            const elementRect = node.getBoundingClientRect();
+            const containerRect = scrollable.getBoundingClientRect();
+            const fullyVisible =
+                elementRect.top >= containerRect.top && elementRect.bottom <= containerRect.bottom;
+            if (fullyVisible) {
+                node.classList.add("highlight");
+                return;
+            }
+            pendingHighlightRef.current = node;
             node.scrollIntoView({
-                behavior: "instant",
+                behavior: "smooth",
                 block: "nearest",
             });
-            node.classList.add("highlight");
         }
     }
-    if (config === undefined) {
-        return (
-            <div
-                style={{
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    height: "100vh",
-                }}
-            >
-                <vscode-icon
-                    name="loading"
-                    spin
-                    spinDuration={1}
-                    size={100}
-                    style={{ color: "var(--vscode-focusBorder)" }}
-                />
-            </div>
-        );
-    }
-    const sortedKeys = Object.keys(config.languages).sort();
-    const warningKeys = Object.fromEntries(
-        sortedKeys.flatMap<[string, Map<string | undefined, TokenWarnings>]>((key) => {
-            const warnings = new Map<string | undefined, TokenWarnings>();
-            // TODO check current text entry, add to warnings[undefined]
-            const todo = {};
-            for (const [
-                source,
-                { lineCommentStart, blockCommentStart, blockCommentEnd },
-            ] of Object.entries(config.languages[key].discovered)) {
-                let currentWarnings = TokenWarnings.None;
-                if (lineCommentStart !== "") {
-                    if (lineCommentStart === blockCommentStart) {
-                        currentWarnings |= TokenWarnings.lineStartMatchesBlockStart;
-                    }
-                    if (lineCommentStart === blockCommentEnd) {
-                        currentWarnings |= TokenWarnings.lineStartMatchesBlockEnd;
-                    }
-                }
-                if (blockCommentStart === "" && blockCommentEnd !== "") {
-                    currentWarnings |= TokenWarnings.blockStartEmpty;
-                } else if (blockCommentStart !== "" && blockCommentEnd === "") {
-                    currentWarnings |= TokenWarnings.blockEndEmpty;
-                }
-                if (currentWarnings !== TokenWarnings.None) {
-                    warnings.set(source, currentWarnings);
-                }
-            }
-            if (warnings.size === 0) {
-                return [];
-            } else {
-                return [[key, warnings]];
-            }
-        })
-    );
-    const filteredKeys =
-        searchValue === "" ? sortedKeys : sortedKeys.filter((key) => key.includes(searchValue));
+    const sortedItems = Object.entries(appState.editing).sort(([a], [b]) => a.localeCompare(b));
+    const filteredItems = isDefinedAndNonEmpty(appState.searchValue)
+        ? sortedItems.filter(([key]) => key.includes(appState.searchValue))
+        : sortedItems;
     return (
-        <div className="tokens-editor">
-            <div className="tokens-header">
-                <vscode-textfield
-                    placeholder="Search language IDs"
-                    value={searchValue}
-                    onInput={(e: React.InputEvent<VscodeTextfield>) =>
-                        setSearchValue(e.currentTarget.value)
-                    }
-                    style={{ width: "100%" }}
-                >
-                    {searchValue !== "" && (
-                        <vscode-badge slot="content-after">
-                            Matches {filteredKeys.length} language ID
-                            {filteredKeys.length !== 1 && "s"}
-                        </vscode-badge>
-                    )}
-                    <vscode-icon
-                        slot="content-after"
-                        name="clear-all"
-                        title="clear search"
-                        actionIcon
-                        onClick={() => setSearchValue("")}
-                    />
-                </vscode-textfield>
-            </div>
-            <div className="tokens-body">
-                <vscode-split-layout
-                    minStart="200px"
-                    initialHandlePosition="200px"
-                    style={{ width: "100%" }}
-                >
-                    <div slot="start">
-                        <vscode-scrollable style={{ height: "100%" }}>
-                            <vscode-tree
-                                onvsc-tree-select={(e: VscTreeSelectEvent) => {
-                                    // HACK: https://github.com/vscode-elements/elements/issues/649
-                                    const selectedItems = e.detail as unknown as VscodeTreeItem[];
-                                    const [first] = selectedItems;
-                                    const dataKey = first?.dataset.languageId;
-                                    if (dataKey !== undefined) {
-                                        scrollToItem(dataKey);
+        <Spinner showSpinner={appState.state === "loading"}>
+            <div className="tokens-editor">
+                <div className="tokens-header">
+                    <vscode-textfield
+                        placeholder="Search language IDs"
+                        value={appState.searchValue}
+                        onInput={(e: React.InputEvent<VscodeTextfield>) => {
+                            const target = e.currentTarget;
+                            setAppState((oldState) => ({ ...oldState, searchValue: target.value }));
+                        }}
+                        style={{ width: "100%" }}
+                    >
+                        {appState.searchValue !== "" && (
+                            <>
+                                <vscode-badge slot="content-after">
+                                    Matches {filteredItems.length} language ID
+                                    {filteredItems.length !== 1 && "s"}
+                                </vscode-badge>
+                                <vscode-icon
+                                    slot="content-after"
+                                    name="clear-all"
+                                    title="clear search"
+                                    actionIcon
+                                    onClick={() => {
+                                        setAppState((oldState) => ({
+                                            ...oldState,
+                                            searchValue: "",
+                                        }));
+                                    }}
+                                />
+                            </>
+                        )}
+                    </vscode-textfield>
+                    <div
+                        style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                        }}
+                    >
+                        <vscode-button-group>
+                            <vscode-button
+                                icon="add"
+                                onClick={() => {
+                                    throw new Error("add not implemented");
+                                }}
+                            >
+                                {LL.CommentTokens.App.AddLanguage()}
+                            </vscode-button>
+                            <vscode-button
+                                icon="discard"
+                                onClick={() => {
+                                    throw new Error("undo not implemented");
+                                }}
+                            >
+                                {LL.CommentTokens.App.Undo()}
+                            </vscode-button>
+                            <vscode-button
+                                icon="redo"
+                                onClick={() => {
+                                    throw new Error("redo not implemented");
+                                }}
+                            >
+                                {LL.CommentTokens.App.Redo()}
+                            </vscode-button>
+                        </vscode-button-group>
+                        <vscode-button-group>
+                            <vscode-button
+                                icon="close"
+                                onClick={() => {
+                                    vscode.postMessage({
+                                        type: "discard",
+                                    } satisfies FromWebView.Message);
+                                }}
+                            >
+                                {LL.CommentTokens.App.Discard()}
+                            </vscode-button>
+                            <vscode-button
+                                icon="check"
+                                onClick={() => {
+                                    vscode.postMessage({
+                                        type: "commit",
+                                        editedConfig: appState.editing,
+                                    } satisfies FromWebView.Message);
+                                }}
+                            >
+                                {LL.CommentTokens.App.Commit()}
+                            </vscode-button>
+                        </vscode-button-group>
+                    </div>
+                </div>
+                <div className="tokens-body">
+                    <vscode-split-layout
+                        minStart="200px"
+                        initialHandlePosition="200px"
+                        style={{ width: "100%" }}
+                    >
+                        <div slot="start">
+                            <Scrollable
+                                ref={leftScrollableRef}
+                                style={{ height: "100%" }}
+                                onScrollEnd={(e: React.UIEvent<HTMLDivElement, UIEvent>) => {
+                                    const leftScrollPos = e.currentTarget.scrollTop;
+                                    setAppState((oldState) => ({ ...oldState, leftScrollPos }));
+                                }}
+                            >
+                                <vscode-tree
+                                    onvsc-tree-select={(e: VscTreeSelectEvent) => {
+                                        // HACK: https://github.com/vscode-elements/elements/issues/649
+                                        const selectedItems =
+                                            e.detail as unknown as VscodeTreeItem[];
+                                        const [first] = selectedItems;
+                                        const dataKey = first?.dataset.languageId;
+                                        if (dataKey !== undefined) {
+                                            scrollToItem(dataKey);
+                                        }
+                                    }}
+                                >
+                                    {filteredItems.map(([languageId, tokens]) => {
+                                        const warningsCount = getWarningsCount(tokens);
+                                        const isNew =
+                                            appState.baselineConfig[languageId] === undefined;
+                                        return (
+                                            <vscode-tree-item
+                                                key={languageId}
+                                                data-language-id={languageId}
+                                            >
+                                                {languageId}
+                                                {warningsCount !== 0 && (
+                                                    <vscode-badge
+                                                        variant="activity-bar-counter"
+                                                        slot="decoration"
+                                                        className="warning"
+                                                    >
+                                                        {warningsCount}
+                                                    </vscode-badge>
+                                                )}
+                                                {isNew && (
+                                                    <vscode-icon name="sparkle" slot="decoration" />
+                                                )}
+                                            </vscode-tree-item>
+                                        );
+                                    })}
+                                </vscode-tree>
+                            </Scrollable>
+                        </div>
+                        <div slot="end">
+                            <Scrollable
+                                ref={rightScrollableRef}
+                                style={{ height: "100%" }}
+                                onScrollEnd={(e: React.UIEvent<HTMLDivElement, UIEvent>) => {
+                                    const rightScrollPos = e.currentTarget.scrollTop;
+                                    setAppState((oldState) => ({ ...oldState, rightScrollPos }));
+                                    const pendingHighlight = pendingHighlightRef.current;
+                                    if (pendingHighlight !== null) {
+                                        pendingHighlight.classList.add("highlight");
                                     }
                                 }}
                             >
-                                {filteredKeys.map((key) => (
-                                    <vscode-tree-item key={key} data-language-id={key}>
-                                        {key}
-                                        {warningKeys[key] !== undefined && (
-                                            <vscode-badge
-                                                variant="activity-bar-counter"
-                                                slot="decoration"
-                                                className="warning"
-                                            >
-                                                {warningKeys[key].size}
-                                            </vscode-badge>
-                                        )}
-                                    </vscode-tree-item>
-                                ))}
-                            </vscode-tree>
-                        </vscode-scrollable>
-                    </div>
-                    <div slot="end">
-                        <vscode-scrollable style={{ height: "100%" }}>
-                            {sortedKeys.map((key, index) => (
-                                <Fragment key={key}>
-                                    {index !== 0 && <vscode-divider />}
-                                    <div
-                                        ref={(node: HTMLDivElement) => {
-                                            const map = itemRefs.current;
-                                            map.set(key, node);
-                                            return () => {
-                                                map.delete(key);
-                                            };
-                                        }}
-                                    >
-                                        <div className="config-header">{key}</div>
-                                        <vscode-form-group variant="settings-group">
-                                            <vscode-label htmlFor={`${key}-lineStart`}>
-                                                Line comment start:
-                                            </vscode-label>
-                                            <vscode-textfield
-                                                id={`${key}-lineStart`}
-                                                placeholder="(unset)"
-                                            />
-                                        </vscode-form-group>
-                                        <vscode-form-group variant="settings-group">
-                                            <vscode-label htmlFor={`${key}-blockStart`}>
-                                                Block comment start:
-                                            </vscode-label>
-                                            <vscode-textfield
-                                                id={`${key}-blockStart`}
-                                                placeholder="(unset)"
-                                            />
-                                        </vscode-form-group>
-                                        <vscode-form-group variant="settings-group">
-                                            <vscode-label htmlFor={`${key}-blockEnd`}>
-                                                Block comment end:
-                                            </vscode-label>
-                                            <vscode-textfield
-                                                id={`${key}-blockEnd`}
-                                                placeholder="(unset)"
-                                            />
-                                        </vscode-form-group>
-                                    </div>
-                                </Fragment>
-                            ))}
-                        </vscode-scrollable>
-                    </div>
-                </vscode-split-layout>
-                {/* <SplitPane>
-                    <SplitPane.Pane preferredSize={200}>
-                        <div className="column">
-                            {searchValue !== "" && (
-                                <div>
-                                    {sortedKeys.filter((key) => key.includes(searchValue)).length}{" "}
-                                    languages
-                                </div>
-                            )}
-                            <Menu>
-                                {sortedKeys
-                                    .filter((key) => key.includes(searchValue))
-                                    .map((key) => (
-                                        <MenuItem
-                                            key={key}
-                                            onClick={() => scrollToItem(key)}
-                                            rightContent={
-                                                warningKeys[key] !== undefined && (
-                                                    <Badge variant="warning" size="xs">
-                                                        {warningKeys[key].size}
-                                                    </Badge>
-                                                )
-                                            }
+                                {sortedItems.map(([languageId, configItem], index) => (
+                                    <Fragment key={languageId}>
+                                        {index !== 0 && <vscode-divider />}
+                                        <div
+                                            ref={(node: HTMLDivElement) => {
+                                                const map = itemRefs.current;
+                                                map.set(languageId, node);
+                                                return () => {
+                                                    map.delete(languageId);
+                                                };
+                                            }}
                                         >
-                                            {key}
-                                        </MenuItem>
-                                    ))}
-                            </Menu>
+                                            <LanguageEditor
+                                                languageId={languageId}
+                                                editing={configItem}
+                                                baseline={appState.baselineConfig[languageId]}
+                                                discovered={appState.discovered[languageId]}
+                                                onChange={(value: CommentTokens) => {
+                                                    const newState = { ...appState };
+                                                    const entry = newState.editing[languageId];
+                                                    if (entry === undefined) {
+                                                        throw new Error(
+                                                            "`entry` not defined within language editor"
+                                                        );
+                                                    }
+                                                    entry.lineCommentStart = value.lineCommentStart;
+                                                    entry.blockCommentStart =
+                                                        value.blockCommentStart;
+                                                    entry.blockCommentEnd = value.blockCommentEnd;
+                                                    setAppState(newState);
+                                                }}
+                                            />
+                                        </div>
+                                    </Fragment>
+                                ))}
+                            </Scrollable>
                         </div>
-                    </SplitPane.Pane>
-                    <SplitPane.Pane>
-                        <div className="column">
-                            {sortedKeys.map((key) => (
-                                <div
-                                    key={key}
-                                    ref={(node: HTMLDivElement) => {
-                                        const map = itemRefs.current;
-                                        map.set(key, node);
-                                        return () => {
-                                            map.delete(key);
-                                        };
-                                    }}
-                                >
-                                    {key}
-                                </div>
-                            ))}
-                        </div>
-                    </SplitPane.Pane>
-                </SplitPane> */}
+                    </vscode-split-layout>
+                </div>
             </div>
-        </div>
+        </Spinner>
     );
-    // return (
-    //     <div style={{ padding: "var(--bk-spacing-6)" }}>
-    //         <h1>Comment Tokens</h1>
-    //         <table>
-    //             <thead>
-    //                 <tr>
-    //                     <th></th>
-    //                     <th>Source</th>
-    //                     <th>Line Comment Start</th>
-    //                     <th>Block Comment Start</th>
-    //                     <th>Block Comment End</th>
-    //                 </tr>
-    //             </thead>
-    //             {Object.entries(config.languages).map(([language, { current, discovered }]) => (
-    //                 <Language
-    //                     key={language}
-    //                     language={language}
-    //                     current={current}
-    //                     discovered={discovered}
-    //                 />
-    //             ))}
-    //         </table>
-    //     </div>
-    // );
-    // return (
-    //     <div style={{ padding: "var(--bk-spacing-6)" }}>
-    //         <Alert variant="info" title="Welcome">
-    //             Your extension is now using Baukasten!
-    //         </Alert>
-
-    //         <Input
-    //             // label="Name"
-    //             placeholder="Enter your name"
-    //             style={{ marginTop: "var(--bk-spacing-4)" }}
-    //         />
-
-    //         <Button variant="primary" style={{ marginTop: "var(--bk-spacing-4)" }}>
-    //             Submit
-    //         </Button>
-    //     </div>
-    // );
-}
-
-function getStackTrace(error: unknown): string {
-    return error instanceof Error && error.stack !== undefined ? error.stack : "<no stack trace>";
 }
 
 const rootElement = document.getElementById("root");
@@ -437,14 +716,9 @@ if (rootElement === null) {
 
 const root = createRoot(rootElement);
 root.render(
-    <ErrorBoundary
-        fallbackRender={({ error }: FallbackProps): React.JSX.Element => (
-            <>
-                <h1 style={{ color: "var(--bk-color-danger)" }}>{getErrorMessage(error)}</h1>
-                <div>{getStackTrace(error)}</div>
-            </>
-        )}
-    >
-        <App />
-    </ErrorBoundary>
+    <Root>
+        <I18nRoot>
+            <App />
+        </I18nRoot>
+    </Root>
 );

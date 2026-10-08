@@ -6,6 +6,7 @@
         "lib": ["esnext", "DOM"],
         "types": [],
         "jsx": "react-jsx",
+        "noUncheckedIndexedAccess": true,
         "strict": true
     },
     "include": ["."]

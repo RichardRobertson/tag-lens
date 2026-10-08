@@ -2,9 +2,7 @@ import assert from "node:assert";
 import * as commands from "@generated/commands";
 import * as configuration from "@generated/configuration";
 import * as views from "@generated/views";
-import Handlebars from "handlebars";
 import * as vscode from "vscode";
-import z from "zod";
 import { getExtensionLanguageCommentTokens } from "./commentTokens";
 import {
     contributeNamespace,
@@ -18,15 +16,17 @@ import { cancelUri, enqueueFile, fileScannerUpdateConfig, initFileScanner } from
 import { SourcesTreeProvider } from "./sourcesTreeProvider";
 import { FileNodeWrapper, TagsTreeProvider } from "./treeProvider";
 import { trace } from "./util";
-import type { WebViewMessage } from "./webviewMessage";
+import { createWebView } from "./webview";
+import {
+    enumContainsFlag,
+    FromWebView,
+    TokenWarnings,
+    ToWebView,
+    validateCommentTokens,
+} from "./webviewMessage";
 
 export const openTagLinkCommand = "tag-lens.openTagLink";
 const disabledWorkspaceFolderState = "tag-lens.disabledWorkspaceFolderState";
-
-const webViewDataSchema = z.object({
-    type: z.literal("apply"),
-    data: z.record(z.string(), z.string()),
-});
 
 export async function activate(context: vscode.ExtensionContext): Promise<{
     contributeNamespace(
@@ -34,16 +34,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<{
         options: ProviderRegistrationOptions
     ): Promise<vscode.Disposable>;
 }> {
-    Handlebars.registerHelper("and", (a, b) => a && b);
-    Handlebars.registerHelper("not", (value) => !value);
-    const commentTokensTemplate = Handlebars.compile(
-        new TextDecoder("utf-8").decode(
-            await vscode.workspace.fs.readFile(
-                vscode.Uri.joinPath(context.extensionUri, "resources", "commentTokens.handlebars")
-            )
-        )
-    );
-
     const outputChannel = vscode.window.createOutputChannel(vscode.l10n.t("Tag Lens"), {
         log: true,
     });
@@ -471,184 +461,138 @@ export async function activate(context: vscode.ExtensionContext): Promise<{
             reloadConfigDebounced("onDidChangeWorkspaceFolders")
         ),
         vscode.commands.registerCommand(commands.scanLanguageComments, async () => {
-            const discoveryPromise = getExtensionLanguageCommentTokens().then(
-                (discoveredTokens) => {
-                    const currentTokens = configuration.getCommentTokens();
-                    const languageIds = new Set([
-                        ...Object.keys(discoveredTokens),
-                        ...Object.keys(currentTokens),
-                    ]);
-                    const languages: Record<
-                        string,
-                        {
-                            current?: configuration.CommentTokens[string];
-                            discovered: configuration.CommentTokens;
-                        }
-                    > = Object.fromEntries(
-                        languageIds.entries().map(([languageId]) => [
-                            languageId,
-                            {
-                                current: currentTokens[languageId],
-                                discovered: discoveredTokens[languageId] ?? {},
-                            },
-                        ])
-                    );
-                    return languages;
-                }
-            );
             const { promise: readyPromise, resolve: readyResolve } = Promise.withResolvers<void>();
-            const panel = vscode.window.createWebviewPanel(
+            const { disposable: panelDisposable, postMessage } = createWebView(
+                context,
                 "tag-lens.commentTokens",
                 "Tag Lens: Comment Tokens",
-                vscode.ViewColumn.Active,
-                { enableScripts: true }
-            );
-            const panelMessageDisposable = panel.webview.onDidReceiveMessage(
-                (message: WebViewMessage) => {
-                    const todo = undefined;
+                "commentTokens",
+                ToWebView.Message,
+                FromWebView.Message,
+                (message) => {
                     switch (message.type) {
                         case "ready":
                             readyResolve();
-                            break;
-                        case "commit":
-                            // TODO: apply the config built by the webview
-                            break;
-                        default:
-                            throw new Error(
-                                `${message.type} should not be called from the webview side`
-                            );
+                            return;
+                        case "commit": {
+                            const empties: string[] = [];
+                            const invalids: [string, TokenWarnings][] = [];
+                            for (const [languageId, tokens] of Object.entries(
+                                message.editedConfig
+                            )) {
+                                const warnings = validateCommentTokens(tokens);
+                                if (warnings === TokenWarnings.None) {
+                                    continue;
+                                }
+                                if (warnings === TokenWarnings.AllEmpty) {
+                                    empties.push(languageId);
+                                } else {
+                                    invalids.push([languageId, warnings]);
+                                }
+                            }
+                            if (invalids.length !== 0) {
+                                outputChannel.error(
+                                    "One or more languages had errors, and the configuration has not been modified:"
+                                );
+                                for (const [languageId, warnings] of invalids) {
+                                    outputChannel.error(`    ${languageId}`);
+                                    if (
+                                        enumContainsFlag(
+                                            warnings,
+                                            TokenWarnings.LineStartMatchesBlockStart
+                                        )
+                                    ) {
+                                        outputChannel.error(
+                                            "        Line comment start matches block comment start"
+                                        );
+                                    }
+                                    if (
+                                        enumContainsFlag(
+                                            warnings,
+                                            TokenWarnings.LineStartMatchesBlockEnd
+                                        )
+                                    ) {
+                                        outputChannel.error(
+                                            "        Line comment start matches block comment end"
+                                        );
+                                    }
+                                    if (enumContainsFlag(warnings, TokenWarnings.BlockStartEmpty)) {
+                                        outputChannel.error(
+                                            "        Block comment start is empty when a value was provided for block comment end"
+                                        );
+                                    }
+                                    if (enumContainsFlag(warnings, TokenWarnings.BlockEndEmpty)) {
+                                        outputChannel.error(
+                                            "        Block comment end is empty when a value was provided for block comment start"
+                                        );
+                                    }
+                                }
+                                vscode.window
+                                    .showErrorMessage(
+                                        "One or more languages had errors, and the configuration has not been modified.",
+                                        "Show Details"
+                                    )
+                                    .then((selected) => {
+                                        if (selected === "Show Details") {
+                                            outputChannel.show();
+                                        }
+                                    });
+                                return;
+                            }
+                            if (empties.length !== 0) {
+                                outputChannel.warn(
+                                    "One or more languages had no tokens specified, and they will be trimmed from the configuration:"
+                                );
+                                for (const languageId of empties) {
+                                    outputChannel.warn(`    ${languageId}`);
+                                    delete message.editedConfig[languageId];
+                                }
+                                vscode.window
+                                    .showWarningMessage(
+                                        "One or more languages had no tokens specified, and they will be trimmed from the configuration.",
+                                        "Show Details"
+                                    )
+                                    .then((selected) => {
+                                        if (selected === "Show Details") {
+                                            outputChannel.show();
+                                        }
+                                    });
+                            }
+                            configuration.updateCommentTokens(message.editedConfig);
+                            panelDisposable.dispose();
+                            return;
+                        }
+                        case "discard": {
+                            const items: vscode.MessageItem[] = [
+                                { title: "Yes" },
+                                { title: "No" },
+                            ] as const;
+                            vscode.window
+                                .showInformationMessage(
+                                    "Are you sure you want to discard all changes?",
+                                    { modal: true },
+                                    ...items
+                                )
+                                .then((value) => {
+                                    if (value === items[0]) {
+                                        panelDisposable.dispose();
+                                    }
+                                });
+                            return;
+                        }
                     }
                 }
             );
-            panel.webview.html = `<html>
-                <head>
-                    <link rel="stylesheel" href="${panel.webview.asWebviewUri(
-                        vscode.Uri.joinPath(context.extensionUri, "dist", "codicons", "codicon.css")
-                    )}" id="vscode-codicon-stylesheet" />
-                    <script src="${panel.webview.asWebviewUri(
-                        vscode.Uri.joinPath(
-                            context.extensionUri,
-                            "dist",
-                            "webview",
-                            "commentTokens.js"
-                        )
-                    )}" type="module" defer></script>
-                    <link rel="stylesheet" href="${panel.webview.asWebviewUri(
-                        vscode.Uri.joinPath(
-                            context.extensionUri,
-                            "dist",
-                            "webview",
-                            "commentTokens.css"
-                        )
-                    )}" />
-                </head>
-                <body>
-                    <div id="root"></div>
-                </body>
-            </html>`;
-            let panelDisposed = false;
-            context.subscriptions.push({
-                dispose(): void {
-                    if (!panelDisposed) {
-                        panel.dispose();
-                        panelMessageDisposable.dispose();
-                        panelDisposed = true;
-                    }
-                },
-            });
-            const [languages] = await Promise.all([discoveryPromise, readyPromise]);
-            await panel.webview.postMessage({
+            context.subscriptions.push(panelDisposable);
+            const [discovered] = await Promise.all([
+                getExtensionLanguageCommentTokens(),
+                readyPromise,
+            ]);
+            await postMessage({
                 type: "setConfig",
-                config: { languages },
+                baselineConfig: configuration.getCommentTokens(),
+                discovered: discovered,
             });
-            // const panel = vscode.window.createWebviewPanel(
-            //     "tag-lens.commentTokens",
-            //     "Tag Lens: Comment Tokens",
-            //     vscode.ViewColumn.Active,
-            //     { enableScripts: true }
-            // );
-            // panel.webview.html = commentTokensTemplate({
-            //     script: panel.webview.asWebviewUri(
-            //         vscode.Uri.joinPath(context.extensionUri, "resources", "commentTokens.js")
-            //     ),
-            //     stylesheet: panel.webview.asWebviewUri(
-            //         vscode.Uri.joinPath(context.extensionUri, "resources", "commentTokens.css")
-            //     ),
-            //     codicon: panel.webview.asWebviewUri(
-            //         vscode.Uri.joinPath(context.extensionUri, "dist", "codicons", "codicon.css")
-            //     ),
-            //     languages,
-            // });
-            // let panelDisposed = false;
-            // const panelDisposable = {
-            //     dispose(): void {
-            //         if (!panelDisposed) {
-            //             panel.dispose();
-            //             panelDisposed = true;
-            //         }
-            //     },
-            // };
-            // context.subscriptions.push(
-            //     panelDisposable,
-            //     panel.webview.onDidReceiveMessage((e) => {
-            //         try {
-            //             const message = webViewDataSchema.parse(e);
-            //             const newCommentTags = Object.fromEntries(
-            //                 [...languageIds]
-            //                     .sort()
-            //                     .filter((languageId) => message.data[languageId] !== "remove")
-            //                     .map((languageId) => {
-            //                         const languageChoice = message.data[languageId];
-            //                         switch (languageChoice) {
-            //                             case "current":
-            //                                 return [
-            //                                     languageId,
-            //                                     languages[languageId].current ?? {},
-            //                                 ];
-            //                             case "custom": {
-            //                                 const lineCommentStart =
-            //                                     message.data[`${languageId}.lineCommentStart`];
-            //                                 const blockCommentStart =
-            //                                     message.data[`${languageId}.blockCommentStart`];
-            //                                 const blockCommentEnd =
-            //                                     message.data[`${languageId}.blockCommentEnd`];
-            //                                 return [
-            //                                     languageId,
-            //                                     {
-            //                                         lineCommentStart:
-            //                                             lineCommentStart === ""
-            //                                                 ? undefined
-            //                                                 : lineCommentStart,
-            //                                         blockCommentStart:
-            //                                             blockCommentStart === ""
-            //                                                 ? undefined
-            //                                                 : blockCommentStart,
-            //                                         blockCommentEnd:
-            //                                             blockCommentEnd === ""
-            //                                                 ? undefined
-            //                                                 : blockCommentEnd,
-            //                                     },
-            //                                 ];
-            //                             }
-            //                             default:
-            //                                 return [
-            //                                     languageId,
-            //                                     languages[languageId].discovered[
-            //                                         message.data[languageId]
-            //                                     ],
-            //                                 ];
-            //                         }
-            //                     })
-            //             );
-            //             configuration.updateCommentTokens(
-            //                 newCommentTags,
-            //                 vscode.ConfigurationTarget.Global
-            //             );
-            //         } finally {
-            //             panelDisposable.dispose();
-            //         }
-            //     })
-            // );
         }),
         vscode.workspace.onDidChangeWorkspaceFolders(tagsTreeProvider.onDidChangeWorkspaceFolders),
         reloadProvidersEmitter.event(() => {

@@ -1,6 +1,7 @@
-import {
+import type {
     VscodeBadge,
     VscodeButton,
+    VscodeButtonGroup,
     VscodeCheckbox,
     VscodeCheckboxGroup,
     VscodeCollapsible,
@@ -35,6 +36,7 @@ import {
 } from "@vscode-elements/elements";
 import type { VscCollapsibleToggleEvent } from "@vscode-elements/elements/dist/vscode-collapsible/vscode-collapsible";
 import type { VscContextMenuSelectEvent } from "@vscode-elements/elements/dist/vscode-context-menu/vscode-context-menu";
+import type { VscScrollableScrollEvent } from "@vscode-elements/elements/dist/vscode-scrollable/vscode-scrollable";
 import type {
     VscodeSplitLayout,
     VscSplitLayoutChangeEvent,
@@ -62,6 +64,7 @@ declare module "react" {
             };
             "vscode-badge": WebComponentProps<VscodeBadge>;
             "vscode-button": WebComponentProps<VscodeButton>;
+            "vscode-button-group": WebComponentProps<VscodeButtonGroup>;
             "vscode-checkbox": WebComponentProps<VscodeCheckbox>;
             "vscode-checkbox-group": WebComponentProps<VscodeCheckboxGroup>;
             "vscode-collapsible": WebComponentProps<VscodeCollapsible> & {
@@ -82,7 +85,9 @@ declare module "react" {
             "vscode-progress-ring": WebComponentProps<VscodeProgressRing>;
             "vscode-radio": WebComponentProps<VscodeRadio>;
             "vscode-radio-group": WebComponentProps<VscodeRadioGroup>;
-            "vscode-scrollable": WebComponentProps<VscodeScrollable>;
+            "vscode-scrollable": WebComponentProps<VscodeScrollable> & {
+                "onvsc-scrollable-scroll"?: CustomEventHandler<VscScrollableScrollEvent>;
+            };
             "vscode-single-select": WebComponentProps<VscodeSingleSelect>;
             "vscode-split-layout": WebComponentProps<VscodeSplitLayout> & {
                 "onvsc-split-layout-change"?: CustomEventHandler<VscSplitLayoutChangeEvent>;

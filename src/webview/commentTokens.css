@@ -13,6 +13,7 @@
     margin: 11px auto auto;
     padding: 3px 24px 0 24px;
     width: 100%;
+    box-sizing: border-box;
 }
 
 .tokens-body {
@@ -33,6 +34,28 @@
 vscode-badge.warning {
     --vscode-activityBarBadge-background: var(--vscode-activityWarningBadge-background);
     --vscode-activityBarBadge-foreground: var(--vscode-activityWarningBadge-foreground);
+}
+
+ul.warning {
+    color: var(--vscode-list-warningForeground);
+}
+
+span.pair {
+    white-space: nowrap;
+}
+
+vscode-textfield.mono {
+    --vscode-font-family:
+        var(--monaco-monospace-font), var(--vscode-monospace-font), ui-monospace, monospace;
+}
+
+vscode-button-group,
+vscode-button {
+    margin: 4px;
+}
+
+vscode-button-group vscode-button {
+    margin: 0;
 }
 
 div.highlight {
