@@ -4,11 +4,11 @@ function getStackTrace(error: unknown): string {
     return error instanceof Error && error.stack !== undefined ? error.stack : "<no stack trace>";
 }
 
-export interface RootProps {
+export interface ErrorBoundaryRootProps {
     children?: React.ReactNode;
 }
 
-export function Root({ children }: RootProps): React.JSX.Element {
+export function ErrorBoundaryRoot({ children }: ErrorBoundaryRootProps): React.JSX.Element {
     return (
         <ErrorBoundary
             fallbackRender={({ error }: FallbackProps): React.JSX.Element => (

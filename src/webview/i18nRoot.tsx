@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { navigatorDetector } from "typesafe-i18n/detectors";
+import { htmlLangAttributeDetector } from "typesafe-i18n/detectors";
 
 import TypesafeI18n from "../i18n/i18n-react";
 import { detectLocale } from "../i18n/i18n-util";
 import { loadLocaleAsync } from "../i18n/i18n-util.async";
-import { Spinner } from "./spinner";
+import { Spinner } from "./Spinner";
 
 type LoadedState = { state: "loading" } | { state: "loaded" } | { state: "error"; reason: unknown };
 
@@ -13,7 +13,7 @@ export interface I18nRootProps {
 }
 
 export function I18nRoot({ children }: I18nRootProps): React.JSX.Element {
-    const locale = detectLocale(navigatorDetector);
+    const locale = detectLocale(htmlLangAttributeDetector);
     const [localesLoaded, setLocalesLoaded] = useState<LoadedState>({ state: "loading" });
     useEffect(() => {
         loadLocaleAsync(locale).then(

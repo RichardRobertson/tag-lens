@@ -44,6 +44,12 @@ span.pair {
     white-space: nowrap;
 }
 
+div.spread {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
 vscode-textfield.mono {
     --vscode-font-family:
         var(--monaco-monospace-font), var(--vscode-monospace-font), ui-monospace, monospace;

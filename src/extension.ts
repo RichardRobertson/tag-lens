@@ -3,7 +3,6 @@ import * as commands from "@generated/commands";
 import * as configuration from "@generated/configuration";
 import * as views from "@generated/views";
 import * as vscode from "vscode";
-import { getExtensionLanguageCommentTokens } from "./commentTokens";
 import {
     contributeNamespace,
     initConfigFile,
@@ -12,7 +11,10 @@ import {
     loadConfigUri,
     type ProviderRegistrationOptions,
 } from "./configFile";
+import { getExtensionLanguageCommentTokens } from "./discoverCommentTokens";
 import { cancelUri, enqueueFile, fileScannerUpdateConfig, initFileScanner } from "./fileScanner";
+import { L } from "./i18n/i18n-node";
+import type { Locales, TranslationFunctions } from "./i18n/i18n-types";
 import { SourcesTreeProvider } from "./sourcesTreeProvider";
 import { FileNodeWrapper, TagsTreeProvider } from "./treeProvider";
 import { trace } from "./util";
@@ -20,10 +22,13 @@ import { createWebView } from "./webview";
 import {
     enumContainsFlag,
     FromWebView,
+    type PartialCommentTokens,
     TokenWarnings,
     ToWebView,
     validateCommentTokens,
 } from "./webviewMessage";
+
+export const LL: TranslationFunctions = L[vscode.env.language as Locales] ?? L.en;
 
 export const openTagLinkCommand = "tag-lens.openTagLink";
 const disabledWorkspaceFolderState = "tag-lens.disabledWorkspaceFolderState";
@@ -262,10 +267,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<{
     async function pickWorkspaceFolder(): Promise<vscode.WorkspaceFolder | undefined> {
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (workspaceFolders === undefined) {
-            await vscode.window.showWarningMessage(vscode.l10n.t("No workspace open"));
+            await vscode.window.showWarningMessage(LL.Extension.Warnings.NoWorkspaceOpen());
             return;
         } else if (workspaceFolders.length === 0) {
-            await vscode.window.showWarningMessage(vscode.l10n.t("No workspace folders available"));
+            await vscode.window.showWarningMessage(LL.Extension.Warnings.NoWorkspaceFolders());
             return;
         }
         const items: (vscode.QuickPickItem & { folder: vscode.WorkspaceFolder })[] =
@@ -290,7 +295,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<{
             picked = items[0];
         } else {
             picked = await vscode.window.showQuickPick(items, {
-                placeHolder: "Select a workspace folder",
+                placeHolder: LL.Extension.SelectWorkspacePlaceholder(),
             });
         }
         return picked?.folder;
@@ -465,7 +470,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<{
             const { disposable: panelDisposable, postMessage } = createWebView(
                 context,
                 "tag-lens.commentTokens",
-                "Tag Lens: Comment Tokens",
+                LL.CommentTokens.WebViewTitle(),
                 "commentTokens",
                 ToWebView.Message,
                 FromWebView.Message,
@@ -477,9 +482,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<{
                         case "commit": {
                             const empties: string[] = [];
                             const invalids: [string, TokenWarnings][] = [];
-                            for (const [languageId, tokens] of Object.entries(
-                                message.editedConfig
-                            )) {
+                            const editedConfig = message.editedConfig as Record<
+                                string,
+                                PartialCommentTokens
+                            >;
+                            for (const [languageId, tokens] of Object.entries(editedConfig)) {
+                                if (tokens.lineCommentStart === "") {
+                                    delete tokens.lineCommentStart;
+                                }
+                                if (tokens.blockCommentStart === "") {
+                                    delete tokens.blockCommentStart;
+                                }
+                                if (tokens.blockCommentEnd === "") {
+                                    delete tokens.blockCommentEnd;
+                                }
                                 const warnings = validateCommentTokens(tokens);
                                 if (warnings === TokenWarnings.None) {
                                     continue;
@@ -492,7 +508,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<{
                             }
                             if (invalids.length !== 0) {
                                 outputChannel.error(
-                                    "One or more languages had errors, and the configuration has not been modified:"
+                                    LL.CommentTokens.ConfigurationHasErrorsOutputChannelHeader()
                                 );
                                 for (const [languageId, warnings] of invalids) {
                                     outputChannel.error(`    ${languageId}`);
@@ -503,7 +519,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<{
                                         )
                                     ) {
                                         outputChannel.error(
-                                            "        Line comment start matches block comment start"
+                                            `        ${LL.TokenWarnings.LineStartMatchesBlockStart()}`
                                         );
                                     }
                                     if (
@@ -513,27 +529,27 @@ export async function activate(context: vscode.ExtensionContext): Promise<{
                                         )
                                     ) {
                                         outputChannel.error(
-                                            "        Line comment start matches block comment end"
+                                            `        ${LL.TokenWarnings.LineStartMatchesBlockEnd()}`
                                         );
                                     }
                                     if (enumContainsFlag(warnings, TokenWarnings.BlockStartEmpty)) {
                                         outputChannel.error(
-                                            "        Block comment start is empty when a value was provided for block comment end"
+                                            `        ${LL.TokenWarnings.BlockStartEmpty()}`
                                         );
                                     }
                                     if (enumContainsFlag(warnings, TokenWarnings.BlockEndEmpty)) {
                                         outputChannel.error(
-                                            "        Block comment end is empty when a value was provided for block comment start"
+                                            `        ${LL.TokenWarnings.BlockEndEmpty()}`
                                         );
                                     }
                                 }
                                 vscode.window
                                     .showErrorMessage(
-                                        "One or more languages had errors, and the configuration has not been modified.",
-                                        "Show Details"
+                                        LL.CommentTokens.ConfigurationHasErrorsMessage(),
+                                        LL.GenericButtons.ShowDetails()
                                     )
                                     .then((selected) => {
-                                        if (selected === "Show Details") {
+                                        if (selected !== undefined) {
                                             outputChannel.show();
                                         }
                                     });
@@ -541,41 +557,54 @@ export async function activate(context: vscode.ExtensionContext): Promise<{
                             }
                             if (empties.length !== 0) {
                                 outputChannel.warn(
-                                    "One or more languages had no tokens specified, and they will be trimmed from the configuration:"
+                                    LL.CommentTokens.ConfigurationHasEmptyOutputChannelHeader()
                                 );
                                 for (const languageId of empties) {
                                     outputChannel.warn(`    ${languageId}`);
-                                    delete message.editedConfig[languageId];
+                                    delete editedConfig[languageId];
                                 }
                                 vscode.window
                                     .showWarningMessage(
-                                        "One or more languages had no tokens specified, and they will be trimmed from the configuration.",
-                                        "Show Details"
+                                        LL.CommentTokens.ConfigurationHasEmptyMessage(),
+                                        LL.GenericButtons.ShowDetails()
                                     )
                                     .then((selected) => {
-                                        if (selected === "Show Details") {
+                                        if (selected !== undefined) {
                                             outputChannel.show();
                                         }
                                     });
                             }
-                            configuration.updateCommentTokens(message.editedConfig);
+                            configuration.updateCommentTokens(
+                                editedConfig,
+                                vscode.ConfigurationTarget.Global
+                            );
                             panelDisposable.dispose();
                             return;
                         }
                         case "discard": {
                             const items: vscode.MessageItem[] = [
-                                { title: "Yes" },
-                                { title: "No" },
+                                { title: LL.GenericButtons.Yes() },
+                                { title: LL.GenericButtons.No() },
                             ] as const;
                             vscode.window
                                 .showInformationMessage(
-                                    "Are you sure you want to discard all changes?",
+                                    LL.CommentTokens.ConfirmDiscardChanges(),
                                     { modal: true },
                                     ...items
                                 )
                                 .then((value) => {
                                     if (value === items[0]) {
                                         panelDisposable.dispose();
+                                    }
+                                });
+                            return;
+                        }
+                        case "inputRequest": {
+                            vscode.window
+                                .showInputBox({ prompt: message.prompt, title: message.title })
+                                .then((input) => {
+                                    if (input !== undefined) {
+                                        postMessage({ type: "inputResponse", input });
                                     }
                                 });
                             return;

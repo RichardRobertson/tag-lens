@@ -33,9 +33,11 @@ import {
     ToWebView,
     validateCommentTokens,
 } from "../webviewMessage";
-import { I18nRoot } from "./i18nRoot";
-import { Root } from "./root";
-import { Spinner } from "./spinner";
+
+import { ErrorBoundaryRoot } from "./ErrorBoundaryRoot";
+import { I18nRoot } from "./I18nRoot";
+import { Scrollable } from "./Scrollable";
+import { Spinner } from "./Spinner";
 
 interface WebViewState {
     state: "loading" | "ready";
@@ -45,6 +47,7 @@ interface WebViewState {
     searchValue: string;
     leftScrollPos: number;
     rightScrollPos: number;
+    undoStack: [key: string, tokens: CommentTokens][];
 }
 
 const vscode = acquireVsCodeApi<WebViewState>();
@@ -54,6 +57,7 @@ interface TokenSuggestionProps {
 }
 
 function TokenSuggestion({ value }: TokenSuggestionProps): React.JSX.Element {
+    const { LL } = useI18nContext();
     if (isDefinedAndNonEmpty(value)) {
         return (
             <code>
@@ -65,25 +69,12 @@ function TokenSuggestion({ value }: TokenSuggestionProps): React.JSX.Element {
             </code>
         );
     } else {
-        return <span style={{ color: "var(--vscode-disabledForeground)" }}>(unset)</span>;
+        return (
+            <span style={{ color: "var(--vscode-disabledForeground)" }}>
+                {LL.CommentTokens.LanguageEditor.UnsetPlaceholder()}
+            </span>
+        );
     }
-}
-
-type ScrollableProps = React.ComponentProps<"div">;
-
-function Scrollable({ ref, children, style, ...props }: ScrollableProps): React.JSX.Element {
-    return (
-        <div
-            ref={ref}
-            {...props}
-            style={{
-                overflow: "auto",
-                ...style,
-            }}
-        >
-            {children}
-        </div>
-    );
 }
 
 function stringEffectivelyEqual(a: string | undefined, b: string | undefined): boolean {
@@ -136,6 +127,7 @@ interface LanguageEditorProps {
     editing: CommentTokens;
     discovered?: Record<string, DiscoveredCommentTokens>;
     onChange(value: CommentTokens): void;
+    onDelete(): void;
 }
 
 function LanguageEditor({
@@ -144,6 +136,7 @@ function LanguageEditor({
     editing,
     discovered,
     onChange,
+    onDelete,
 }: LanguageEditorProps): React.JSX.Element {
     const { LL } = useI18nContext();
     const warnings = validateCommentTokens(editing);
@@ -156,7 +149,12 @@ function LanguageEditor({
         warnings & (TokenWarnings.LineStartMatchesBlockEnd | TokenWarnings.BlockEndEmpty);
     return (
         <>
-            <div className="config-header">{languageId}</div>
+            <div className="config-header spread">
+                <span>{languageId}</span>
+                <vscode-button icon="trash" onClick={onDelete}>
+                    {LL.CommentTokens.LanguageEditor.Delete()}
+                </vscode-button>
+            </div>
             {discovered !== undefined &&
                 Object.entries(discovered).map(([extensionId, tokens]) => {
                     return (
@@ -209,7 +207,7 @@ function LanguageEditor({
                 )}
                 <vscode-textfield
                     id={`${languageId}-lineStart`}
-                    placeholder="(unset)"
+                    placeholder={LL.CommentTokens.LanguageEditor.UnsetPlaceholder()}
                     value={editing?.lineCommentStart}
                     className="mono"
                     invalid={warnLineStart !== TokenWarnings.None}
@@ -230,6 +228,7 @@ function LanguageEditor({
                                 slot="content-after"
                                 name="discard"
                                 actionIcon
+                                title={LL.CommentTokens.LanguageEditor.RevertToken()}
                                 onClick={() =>
                                     onChange({
                                         ...editing,
@@ -251,7 +250,7 @@ function LanguageEditor({
                 )}
                 <vscode-textfield
                     id={`${languageId}-blockStart`}
-                    placeholder="(unset)"
+                    placeholder={LL.CommentTokens.LanguageEditor.UnsetPlaceholder()}
                     value={editing?.blockCommentStart}
                     className="mono"
                     invalid={warnBlockStart !== TokenWarnings.None}
@@ -271,6 +270,7 @@ function LanguageEditor({
                             <vscode-icon
                                 slot="content-after"
                                 name="discard"
+                                title={LL.CommentTokens.LanguageEditor.RevertToken()}
                                 actionIcon
                                 onClick={() =>
                                     onChange({
@@ -293,7 +293,7 @@ function LanguageEditor({
                 )}
                 <vscode-textfield
                     id={`${languageId}-blockEnd`}
-                    placeholder="(unset)"
+                    placeholder={LL.CommentTokens.LanguageEditor.UnsetPlaceholder()}
                     value={editing?.blockCommentEnd}
                     className="mono"
                     invalid={warnBlockEnd !== TokenWarnings.None}
@@ -315,6 +315,7 @@ function LanguageEditor({
                                 slot="content-after"
                                 name="discard"
                                 actionIcon
+                                title={LL.CommentTokens.LanguageEditor.RevertToken()}
                                 onClick={() =>
                                     onChange({
                                         ...editing,
@@ -422,25 +423,52 @@ export function App(): React.JSX.Element {
             leftScrollPos: 0,
             rightScrollPos: 0,
             searchValue: "",
+            undoStack: [],
         };
         return state;
     });
     useEffect(() => {
         vscode.setState(appState);
     }, [appState]);
+    const scrollToItemRef = useRef<(key: string) => void>(() => {});
     useEffect(() => {
         const listener = (event: MessageEvent<ToWebView.Message>): void => {
-            const parsedMessage = ToWebView.Message.parse(event.data);
-            switch (parsedMessage.type) {
+            const message = ToWebView.Message.parse(event.data);
+            switch (message.type) {
                 case "setConfig":
                     setAppState({
-                        ...normalizeConfig(parsedMessage.baselineConfig, parsedMessage.discovered),
+                        ...normalizeConfig(message.baselineConfig, message.discovered),
                         state: "ready",
                         searchValue: "",
                         leftScrollPos: 0,
                         rightScrollPos: 0,
+                        undoStack: [],
                     });
                     break;
+                case "inputResponse": {
+                    const input = message.input;
+                    setAppState((oldState) => {
+                        if (input in oldState.editing) {
+                            return oldState;
+                        } else {
+                            return {
+                                ...oldState,
+                                editing: {
+                                    ...oldState.editing,
+                                    [input]: {
+                                        lineCommentStart: "",
+                                        blockCommentStart: "",
+                                        blockCommentEnd: "",
+                                    },
+                                },
+                            };
+                        }
+                    });
+                    requestAnimationFrame(() => {
+                        scrollToItemRef.current(input);
+                    });
+                    break;
+                }
             }
         };
         window.addEventListener("message", listener);
@@ -501,6 +529,7 @@ export function App(): React.JSX.Element {
             });
         }
     }
+    scrollToItemRef.current = scrollToItem;
     const sortedItems = Object.entries(appState.editing).sort(([a], [b]) => a.localeCompare(b));
     const filteredItems = isDefinedAndNonEmpty(appState.searchValue)
         ? sortedItems.filter(([key]) => key.includes(appState.searchValue))
@@ -510,7 +539,7 @@ export function App(): React.JSX.Element {
             <div className="tokens-editor">
                 <div className="tokens-header">
                     <vscode-textfield
-                        placeholder="Search language IDs"
+                        placeholder={LL.CommentTokens.App.SearchPlaceholder()}
                         value={appState.searchValue}
                         onInput={(e: React.InputEvent<VscodeTextfield>) => {
                             const target = e.currentTarget;
@@ -521,13 +550,14 @@ export function App(): React.JSX.Element {
                         {appState.searchValue !== "" && (
                             <>
                                 <vscode-badge slot="content-after">
-                                    Matches {filteredItems.length} language ID
-                                    {filteredItems.length !== 1 && "s"}
+                                    {LL.CommentTokens.App.SearchBadge({
+                                        count: filteredItems.length,
+                                    })}
                                 </vscode-badge>
                                 <vscode-icon
                                     slot="content-after"
                                     name="clear-all"
-                                    title="clear search"
+                                    title={LL.CommentTokens.App.ClearSearch()}
                                     actionIcon
                                     onClick={() => {
                                         setAppState((oldState) => ({
@@ -539,37 +569,46 @@ export function App(): React.JSX.Element {
                             </>
                         )}
                     </vscode-textfield>
-                    <div
-                        style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                        }}
-                    >
+                    <div className="spread">
                         <vscode-button-group>
                             <vscode-button
                                 icon="add"
                                 onClick={() => {
-                                    throw new Error("add not implemented");
+                                    vscode.postMessage({
+                                        type: "inputRequest",
+                                        title: LL.CommentTokens.App.AddTitle(),
+                                        prompt: LL.CommentTokens.App.AddPrompt(),
+                                    } satisfies FromWebView.Message);
                                 }}
                             >
                                 {LL.CommentTokens.App.AddLanguage()}
                             </vscode-button>
                             <vscode-button
                                 icon="discard"
+                                disabled={appState.undoStack.length === 0}
                                 onClick={() => {
-                                    throw new Error("undo not implemented");
+                                    setAppState((oldState) => {
+                                        const newState = { ...oldState };
+                                        const [undoItem, ...undoStack] = newState.undoStack;
+                                        if (undoItem === undefined) {
+                                            throw new Error(
+                                                "unreachable: `undoItem` not defined in undo"
+                                            );
+                                        }
+                                        const [languageId, tokens] = undoItem;
+                                        requestAnimationFrame(() =>
+                                            scrollToItemRef.current(languageId)
+                                        );
+                                        newState.editing = {
+                                            ...newState.editing,
+                                            [languageId]: { ...tokens },
+                                        };
+                                        newState.undoStack = undoStack;
+                                        return newState;
+                                    });
                                 }}
                             >
                                 {LL.CommentTokens.App.Undo()}
-                            </vscode-button>
-                            <vscode-button
-                                icon="redo"
-                                onClick={() => {
-                                    throw new Error("redo not implemented");
-                                }}
-                            >
-                                {LL.CommentTokens.App.Redo()}
                             </vscode-button>
                         </vscode-button-group>
                         <vscode-button-group>
@@ -584,7 +623,7 @@ export function App(): React.JSX.Element {
                                 {LL.CommentTokens.App.Discard()}
                             </vscode-button>
                             <vscode-button
-                                icon="check"
+                                icon="save"
                                 onClick={() => {
                                     vscode.postMessage({
                                         type: "commit",
@@ -687,7 +726,7 @@ export function App(): React.JSX.Element {
                                                     const entry = newState.editing[languageId];
                                                     if (entry === undefined) {
                                                         throw new Error(
-                                                            "`entry` not defined within language editor"
+                                                            "unreachable: `entry` not defined within language editor"
                                                         );
                                                     }
                                                     entry.lineCommentStart = value.lineCommentStart;
@@ -696,6 +735,26 @@ export function App(): React.JSX.Element {
                                                     entry.blockCommentEnd = value.blockCommentEnd;
                                                     setAppState(newState);
                                                 }}
+                                                onDelete={() =>
+                                                    setAppState((oldState) => {
+                                                        const newState = { ...oldState };
+                                                        const {
+                                                            [languageId]: deleted,
+                                                            ...editingMinusLanguage
+                                                        } = newState.editing;
+                                                        if (deleted === undefined) {
+                                                            throw new Error(
+                                                                "unreachable: `deleted` not defined within language editor"
+                                                            );
+                                                        }
+                                                        newState.editing = editingMinusLanguage;
+                                                        newState.undoStack = [
+                                                            [languageId, deleted],
+                                                            ...newState.undoStack,
+                                                        ];
+                                                        return newState;
+                                                    })
+                                                }
                                             />
                                         </div>
                                     </Fragment>
@@ -716,9 +775,9 @@ if (rootElement === null) {
 
 const root = createRoot(rootElement);
 root.render(
-    <Root>
+    <ErrorBoundaryRoot>
         <I18nRoot>
             <App />
         </I18nRoot>
-    </Root>
+    </ErrorBoundaryRoot>
 );

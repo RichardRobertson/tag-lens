@@ -38,10 +38,19 @@ export namespace FromWebView {
 
     export type CommitMessage = z.output<typeof CommitMessage>;
 
+    export const InputRequestMessage = z.strictObject({
+        type: z.literal("inputRequest"),
+        prompt: z.string().optional(),
+        title: z.string().optional(),
+    });
+
+    export type InputRequestMessage = z.output<typeof InputRequestMessage>;
+
     export const Message = z.discriminatedUnion("type", [
         ReadyMessage,
         DiscardMessage,
         CommitMessage,
+        InputRequestMessage,
     ]);
 
     export type Message = z.output<typeof Message>;
@@ -56,7 +65,14 @@ export namespace ToWebView {
 
     export type SetConfigMessage = z.output<typeof SetConfigMessage>;
 
-    export const Message = z.discriminatedUnion("type", [SetConfigMessage]);
+    export const InputResponseMessage = z.strictObject({
+        type: z.literal("inputResponse"),
+        input: z.string(),
+    });
+
+    export type InputResponseMessage = z.output<typeof InputResponseMessage>;
+
+    export const Message = z.discriminatedUnion("type", [SetConfigMessage, InputResponseMessage]);
 
     export type Message = z.output<typeof Message>;
 }

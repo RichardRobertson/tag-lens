@@ -33,7 +33,8 @@ export function createWebView<
         )
     );
     const nonce = crypto.randomBytes(16).toBase64();
-    panel.webview.html = `<html>
+    panel.webview.html = `<!DOCTYPE html>
+    <html lang=${JSON.stringify(vscode.env.language)}>
         <head>
             <meta http-equiv="Content-Security-Policy" content="
                 default-src 'none';
