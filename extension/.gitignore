@@ -1,0 +1,9 @@
+out
+dist
+node_modules
+.vscode-test/
+*.vsix
+generated
+schema
+src/i18n/i18n-*
+package.nls.qps.json

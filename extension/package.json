@@ -1,0 +1,1961 @@
+{
+    "name": "tag-lens",
+    "displayName": "Tag Lens",
+    "description": "Visual Studio Code extension for locating and highlighting user defined tags",
+    "version": "0.1.0",
+    "publisher": "richard-robertson",
+    "author": {
+        "name": "Richard Robertson",
+        "url": "https://github.com/RichardRobertson"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/RichardRobertson/tag-lens.git"
+    },
+    "bugs": {
+        "url": "https://github.com/RichardRobertson/tag-lens/issues"
+    },
+    "engines": {
+        "vscode": "^1.110.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "license": "MIT",
+    "activationEvents": [],
+    "main": "./dist/extension.cjs",
+    "type": "module",
+    "capabilities": {
+        "untrustedWorkspaces": {
+            "supported": true
+        },
+        "virtualWorkspaces": true
+    },
+    "contributes": {
+        "commands": [
+            {
+                "command": "tag-lens.rescanWorkspace",
+                "title": "%tag-lens.commands.rescanWorkspace.title%",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "tag-lens.openGlobalConfig",
+                "title": "%tag-lens.commands.openGlobalConfig.title%"
+            },
+            {
+                "command": "tag-lens.openWorkspaceConfig",
+                "title": "%tag-lens.commands.openWorkspaceConfig.title%"
+            },
+            {
+                "command": "tag-lens.scanLanguageComments",
+                "title": "%tag-lens.commands.scanLanguageComments.title%"
+            },
+            {
+                "command": "tag-lens.toggleWorkspace",
+                "title": "%tag-lens.commands.toggleWorkspace.title%"
+            },
+            {
+                "command": "tag-lens.toggleLooseFiles",
+                "title": "%tag-lens.commands.toggleLooseFiles.title%"
+            }
+        ],
+        "configuration": {
+            "properties": {
+                "tag-lens.patterns": {
+                    "default": {},
+                    "order": 0,
+                    "title": "%tag-lens.configuration.patterns.title%",
+                    "markdownDescription": "%tag-lens.configuration.patterns.markdownDescription%",
+                    "type": "object",
+                    "propertyNames": {
+                        "type": "string"
+                    },
+                    "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                            "pattern": {
+                                "type": "string",
+                                "title": "%tag-lens.configuration.patterns[*].pattern.title%",
+                                "markdownDescription": "%tag-lens.configuration.patterns[*].pattern.markdownDescription%"
+                            },
+                            "literal": {
+                                "title": "%tag-lens.configuration.patterns[*].literal.title%",
+                                "markdownDescription": "%tag-lens.configuration.patterns[*].literal.markdownDescription%",
+                                "type": "boolean"
+                            },
+                            "caseInsensitive": {
+                                "title": "%tag-lens.configuration.patterns[*].caseInsensitive.title%",
+                                "markdownDescription": "%tag-lens.configuration.patterns[*].caseInsensitive.markdownDescription%",
+                                "type": "boolean"
+                            },
+                            "dotAll": {
+                                "title": "%tag-lens.configuration.patterns[*].dotAll.title%",
+                                "markdownDescription": "%tag-lens.configuration.patterns[*].dotAll.markdownDescription%",
+                                "type": "boolean"
+                            },
+                            "disableUnicode": {
+                                "title": "%tag-lens.configuration.patterns[*].disableUnicode.title%",
+                                "markdownDescription": "%tag-lens.configuration.patterns[*].disableUnicode.markdownDescription%",
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "pattern"
+                        ],
+                        "additionalProperties": false
+                    }
+                },
+                "tag-lens.decorationStyles": {
+                    "order": 1,
+                    "title": "%tag-lens.configuration.decorationStyles.title%",
+                    "markdownDescription": "%tag-lens.configuration.decorationStyles.markdownDescription%",
+                    "type": "object",
+                    "propertyNames": {
+                        "type": "string"
+                    },
+                    "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                            "backgroundColor": {
+                                "anyOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "themeColor": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themeColor.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themeColor.markdownDescription%"
+                                            }
+                                        },
+                                        "required": [
+                                            "themeColor"
+                                        ],
+                                        "additionalProperties": false
+                                    }
+                                ],
+                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.backgroundColor.title%",
+                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.backgroundColor.markdownDescription%"
+                            },
+                            "outline": {
+                                "type": "string",
+                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.outline.title%",
+                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.outline.markdownDescription%"
+                            },
+                            "outlineColor": {
+                                "anyOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "themeColor": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themeColor.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themeColor.markdownDescription%"
+                                            }
+                                        },
+                                        "required": [
+                                            "themeColor"
+                                        ],
+                                        "additionalProperties": false
+                                    }
+                                ],
+                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.outlineColor.title%",
+                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.outlineColor.markdownDescription%"
+                            },
+                            "outlineStyle": {
+                                "type": "string",
+                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.outlineStyle.title%",
+                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.outlineStyle.markdownDescription%"
+                            },
+                            "outlineWidth": {
+                                "type": "string",
+                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.outlineWidth.title%",
+                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.outlineWidth.markdownDescription%"
+                            },
+                            "border": {
+                                "type": "string",
+                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.border.title%",
+                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.border.markdownDescription%"
+                            },
+                            "borderColor": {
+                                "anyOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "themeColor": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themeColor.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themeColor.markdownDescription%"
+                                            }
+                                        },
+                                        "required": [
+                                            "themeColor"
+                                        ],
+                                        "additionalProperties": false
+                                    }
+                                ],
+                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.borderColor.title%",
+                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.borderColor.markdownDescription%"
+                            },
+                            "borderRadius": {
+                                "type": "string",
+                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.borderRadius.title%",
+                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.borderRadius.markdownDescription%"
+                            },
+                            "borderSpacing": {
+                                "type": "string",
+                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.borderSpacing.title%",
+                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.borderSpacing.markdownDescription%"
+                            },
+                            "borderStyle": {
+                                "type": "string",
+                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.borderStyle.title%",
+                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.borderStyle.markdownDescription%"
+                            },
+                            "borderWidth": {
+                                "type": "string",
+                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.borderWidth.title%",
+                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.borderWidth.markdownDescription%"
+                            },
+                            "fontStyle": {
+                                "type": "string",
+                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.fontStyle.title%",
+                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.fontStyle.markdownDescription%"
+                            },
+                            "fontWeight": {
+                                "type": "string",
+                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.fontWeight.title%",
+                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.fontWeight.markdownDescription%"
+                            },
+                            "textDecoration": {
+                                "type": "string",
+                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.textDecoration.title%",
+                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.textDecoration.markdownDescription%"
+                            },
+                            "cursor": {
+                                "type": "string",
+                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.cursor.title%",
+                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.cursor.markdownDescription%"
+                            },
+                            "color": {
+                                "anyOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "themeColor": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themeColor.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themeColor.markdownDescription%"
+                                            }
+                                        },
+                                        "required": [
+                                            "themeColor"
+                                        ],
+                                        "additionalProperties": false
+                                    }
+                                ],
+                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.color.title%",
+                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.color.markdownDescription%"
+                            },
+                            "opacity": {
+                                "type": "string",
+                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.opacity.title%",
+                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.opacity.markdownDescription%"
+                            },
+                            "letterSpacing": {
+                                "type": "string",
+                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.letterSpacing.title%",
+                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.letterSpacing.markdownDescription%"
+                            },
+                            "gutterIconPath": {
+                                "anyOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "uri": {
+                                                "type": "string",
+                                                "format": "uri",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].uri.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].uri.markdownDescription%"
+                                            }
+                                        },
+                                        "required": [
+                                            "uri"
+                                        ],
+                                        "additionalProperties": false
+                                    }
+                                ],
+                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.gutterIconPath.title%",
+                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.gutterIconPath.markdownDescription%"
+                            },
+                            "gutterIconSize": {
+                                "type": "string",
+                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.gutterIconSize.title%",
+                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.gutterIconSize.markdownDescription%"
+                            },
+                            "overviewRulerColor": {
+                                "anyOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "themeColor": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themeColor.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themeColor.markdownDescription%"
+                                            }
+                                        },
+                                        "required": [
+                                            "themeColor"
+                                        ],
+                                        "additionalProperties": false
+                                    }
+                                ],
+                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.overviewRulerColor.title%",
+                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.overviewRulerColor.markdownDescription%"
+                            },
+                            "before": {
+                                "type": "object",
+                                "properties": {
+                                    "contentText": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.contentText.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.contentText.markdownDescription%"
+                                    },
+                                    "contentIconPath": {
+                                        "anyOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "properties": {
+                                                    "uri": {
+                                                        "type": "string",
+                                                        "format": "uri",
+                                                        "title": "%tag-lens.configuration.decorationStyles[*].uri.title%",
+                                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].uri.markdownDescription%"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "uri"
+                                                ],
+                                                "additionalProperties": false
+                                            }
+                                        ],
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.contentIconPath.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.contentIconPath.markdownDescription%"
+                                    },
+                                    "border": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.border.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.border.markdownDescription%"
+                                    },
+                                    "borderColor": {
+                                        "anyOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "properties": {
+                                                    "themeColor": {
+                                                        "type": "string",
+                                                        "title": "%tag-lens.configuration.decorationStyles[*].themeColor.title%",
+                                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themeColor.markdownDescription%"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "themeColor"
+                                                ],
+                                                "additionalProperties": false
+                                            }
+                                        ],
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.borderColor.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.borderColor.markdownDescription%"
+                                    },
+                                    "fontStyle": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.fontStyle.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.fontStyle.markdownDescription%"
+                                    },
+                                    "fontWeight": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.fontWeight.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.fontWeight.markdownDescription%"
+                                    },
+                                    "textDecoration": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.textDecoration.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.textDecoration.markdownDescription%"
+                                    },
+                                    "color": {
+                                        "anyOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "properties": {
+                                                    "themeColor": {
+                                                        "type": "string",
+                                                        "title": "%tag-lens.configuration.decorationStyles[*].themeColor.title%",
+                                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themeColor.markdownDescription%"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "themeColor"
+                                                ],
+                                                "additionalProperties": false
+                                            }
+                                        ],
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.color.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.color.markdownDescription%"
+                                    },
+                                    "backgroundColor": {
+                                        "anyOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "properties": {
+                                                    "themeColor": {
+                                                        "type": "string",
+                                                        "title": "%tag-lens.configuration.decorationStyles[*].themeColor.title%",
+                                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themeColor.markdownDescription%"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "themeColor"
+                                                ],
+                                                "additionalProperties": false
+                                            }
+                                        ],
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.backgroundColor.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.backgroundColor.markdownDescription%"
+                                    },
+                                    "margin": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.margin.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.margin.markdownDescription%"
+                                    },
+                                    "width": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.width.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.width.markdownDescription%"
+                                    },
+                                    "height": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.height.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.height.markdownDescription%"
+                                    }
+                                },
+                                "additionalProperties": false,
+                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.before.title%",
+                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.before.markdownDescription%"
+                            },
+                            "after": {
+                                "type": "object",
+                                "properties": {
+                                    "contentText": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.contentText.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.contentText.markdownDescription%"
+                                    },
+                                    "contentIconPath": {
+                                        "anyOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "properties": {
+                                                    "uri": {
+                                                        "type": "string",
+                                                        "format": "uri",
+                                                        "title": "%tag-lens.configuration.decorationStyles[*].uri.title%",
+                                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].uri.markdownDescription%"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "uri"
+                                                ],
+                                                "additionalProperties": false
+                                            }
+                                        ],
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.contentIconPath.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.contentIconPath.markdownDescription%"
+                                    },
+                                    "border": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.border.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.border.markdownDescription%"
+                                    },
+                                    "borderColor": {
+                                        "anyOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "properties": {
+                                                    "themeColor": {
+                                                        "type": "string",
+                                                        "title": "%tag-lens.configuration.decorationStyles[*].themeColor.title%",
+                                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themeColor.markdownDescription%"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "themeColor"
+                                                ],
+                                                "additionalProperties": false
+                                            }
+                                        ],
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.borderColor.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.borderColor.markdownDescription%"
+                                    },
+                                    "fontStyle": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.fontStyle.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.fontStyle.markdownDescription%"
+                                    },
+                                    "fontWeight": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.fontWeight.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.fontWeight.markdownDescription%"
+                                    },
+                                    "textDecoration": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.textDecoration.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.textDecoration.markdownDescription%"
+                                    },
+                                    "color": {
+                                        "anyOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "properties": {
+                                                    "themeColor": {
+                                                        "type": "string",
+                                                        "title": "%tag-lens.configuration.decorationStyles[*].themeColor.title%",
+                                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themeColor.markdownDescription%"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "themeColor"
+                                                ],
+                                                "additionalProperties": false
+                                            }
+                                        ],
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.color.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.color.markdownDescription%"
+                                    },
+                                    "backgroundColor": {
+                                        "anyOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "properties": {
+                                                    "themeColor": {
+                                                        "type": "string",
+                                                        "title": "%tag-lens.configuration.decorationStyles[*].themeColor.title%",
+                                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themeColor.markdownDescription%"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "themeColor"
+                                                ],
+                                                "additionalProperties": false
+                                            }
+                                        ],
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.backgroundColor.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.backgroundColor.markdownDescription%"
+                                    },
+                                    "margin": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.margin.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.margin.markdownDescription%"
+                                    },
+                                    "width": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.width.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.width.markdownDescription%"
+                                    },
+                                    "height": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.height.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.height.markdownDescription%"
+                                    }
+                                },
+                                "additionalProperties": false,
+                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.after.title%",
+                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.after.markdownDescription%"
+                            },
+                            "isWholeLine": {
+                                "type": "boolean",
+                                "title": "%tag-lens.configuration.decorationStyles[*].decorationRenderOptions.isWholeLine.title%",
+                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].decorationRenderOptions.isWholeLine.markdownDescription%"
+                            },
+                            "rangeBehavior": {
+                                "enumItemLabels": [
+                                    "%tag-lens.configuration.decorationStyles[*].decorationRangeBehavior.openOpen.itemLabel%",
+                                    "%tag-lens.configuration.decorationStyles[*].decorationRangeBehavior.closedClosed.itemLabel%",
+                                    "%tag-lens.configuration.decorationStyles[*].decorationRangeBehavior.openClosed.itemLabel%",
+                                    "%tag-lens.configuration.decorationStyles[*].decorationRangeBehavior.closedOpen.itemLabel%"
+                                ],
+                                "markdownEnumDescriptions": [
+                                    "%tag-lens.configuration.decorationStyles[*].decorationRangeBehavior.openOpen.markdownDescription%",
+                                    "%tag-lens.configuration.decorationStyles[*].decorationRangeBehavior.closedClosed.markdownDescription%",
+                                    "%tag-lens.configuration.decorationStyles[*].decorationRangeBehavior.openClosed.markdownDescription%",
+                                    "%tag-lens.configuration.decorationStyles[*].decorationRangeBehavior.closedOpen.markdownDescription%"
+                                ],
+                                "title": "%tag-lens.configuration.decorationStyles[*].decorationRenderOptions.rangeBehavior.title%",
+                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].decorationRenderOptions.rangeBehavior.markdownDescription%",
+                                "type": "string",
+                                "enum": [
+                                    "openOpen",
+                                    "closedClosed",
+                                    "openClosed",
+                                    "closedOpen"
+                                ]
+                            },
+                            "overviewRulerLane": {
+                                "enumItemLabels": [
+                                    "%tag-lens.configuration.decorationStyles[*].overviewRulerLane.left.itemLabel%",
+                                    "%tag-lens.configuration.decorationStyles[*].overviewRulerLane.center.itemLabel%",
+                                    "%tag-lens.configuration.decorationStyles[*].overviewRulerLane.right.itemLabel%",
+                                    "%tag-lens.configuration.decorationStyles[*].overviewRulerLane.full.itemLabel%"
+                                ],
+                                "markdownEnumDescriptions": [
+                                    "%tag-lens.configuration.decorationStyles[*].overviewRulerLane.left.markdownDescription%",
+                                    "%tag-lens.configuration.decorationStyles[*].overviewRulerLane.center.markdownDescription%",
+                                    "%tag-lens.configuration.decorationStyles[*].overviewRulerLane.right.markdownDescription%",
+                                    "%tag-lens.configuration.decorationStyles[*].overviewRulerLane.full.markdownDescription%"
+                                ],
+                                "title": "%tag-lens.configuration.decorationStyles[*].decorationRenderOptions.overviewRulerLane.title%",
+                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].decorationRenderOptions.overviewRulerLane.markdownDescription%",
+                                "type": "string",
+                                "enum": [
+                                    "left",
+                                    "center",
+                                    "right",
+                                    "full"
+                                ]
+                            },
+                            "light": {
+                                "type": "object",
+                                "properties": {
+                                    "backgroundColor": {
+                                        "anyOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "properties": {
+                                                    "themeColor": {
+                                                        "type": "string",
+                                                        "title": "%tag-lens.configuration.decorationStyles[*].themeColor.title%",
+                                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themeColor.markdownDescription%"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "themeColor"
+                                                ],
+                                                "additionalProperties": false
+                                            }
+                                        ],
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.backgroundColor.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.backgroundColor.markdownDescription%"
+                                    },
+                                    "outline": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.outline.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.outline.markdownDescription%"
+                                    },
+                                    "outlineColor": {
+                                        "anyOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "properties": {
+                                                    "themeColor": {
+                                                        "type": "string",
+                                                        "title": "%tag-lens.configuration.decorationStyles[*].themeColor.title%",
+                                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themeColor.markdownDescription%"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "themeColor"
+                                                ],
+                                                "additionalProperties": false
+                                            }
+                                        ],
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.outlineColor.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.outlineColor.markdownDescription%"
+                                    },
+                                    "outlineStyle": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.outlineStyle.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.outlineStyle.markdownDescription%"
+                                    },
+                                    "outlineWidth": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.outlineWidth.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.outlineWidth.markdownDescription%"
+                                    },
+                                    "border": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.border.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.border.markdownDescription%"
+                                    },
+                                    "borderColor": {
+                                        "anyOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "properties": {
+                                                    "themeColor": {
+                                                        "type": "string",
+                                                        "title": "%tag-lens.configuration.decorationStyles[*].themeColor.title%",
+                                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themeColor.markdownDescription%"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "themeColor"
+                                                ],
+                                                "additionalProperties": false
+                                            }
+                                        ],
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.borderColor.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.borderColor.markdownDescription%"
+                                    },
+                                    "borderRadius": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.borderRadius.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.borderRadius.markdownDescription%"
+                                    },
+                                    "borderSpacing": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.borderSpacing.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.borderSpacing.markdownDescription%"
+                                    },
+                                    "borderStyle": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.borderStyle.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.borderStyle.markdownDescription%"
+                                    },
+                                    "borderWidth": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.borderWidth.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.borderWidth.markdownDescription%"
+                                    },
+                                    "fontStyle": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.fontStyle.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.fontStyle.markdownDescription%"
+                                    },
+                                    "fontWeight": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.fontWeight.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.fontWeight.markdownDescription%"
+                                    },
+                                    "textDecoration": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.textDecoration.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.textDecoration.markdownDescription%"
+                                    },
+                                    "cursor": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.cursor.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.cursor.markdownDescription%"
+                                    },
+                                    "color": {
+                                        "anyOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "properties": {
+                                                    "themeColor": {
+                                                        "type": "string",
+                                                        "title": "%tag-lens.configuration.decorationStyles[*].themeColor.title%",
+                                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themeColor.markdownDescription%"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "themeColor"
+                                                ],
+                                                "additionalProperties": false
+                                            }
+                                        ],
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.color.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.color.markdownDescription%"
+                                    },
+                                    "opacity": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.opacity.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.opacity.markdownDescription%"
+                                    },
+                                    "letterSpacing": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.letterSpacing.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.letterSpacing.markdownDescription%"
+                                    },
+                                    "gutterIconPath": {
+                                        "anyOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "properties": {
+                                                    "uri": {
+                                                        "type": "string",
+                                                        "format": "uri",
+                                                        "title": "%tag-lens.configuration.decorationStyles[*].uri.title%",
+                                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].uri.markdownDescription%"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "uri"
+                                                ],
+                                                "additionalProperties": false
+                                            }
+                                        ],
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.gutterIconPath.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.gutterIconPath.markdownDescription%"
+                                    },
+                                    "gutterIconSize": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.gutterIconSize.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.gutterIconSize.markdownDescription%"
+                                    },
+                                    "overviewRulerColor": {
+                                        "anyOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "properties": {
+                                                    "themeColor": {
+                                                        "type": "string",
+                                                        "title": "%tag-lens.configuration.decorationStyles[*].themeColor.title%",
+                                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themeColor.markdownDescription%"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "themeColor"
+                                                ],
+                                                "additionalProperties": false
+                                            }
+                                        ],
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.overviewRulerColor.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.overviewRulerColor.markdownDescription%"
+                                    },
+                                    "before": {
+                                        "type": "object",
+                                        "properties": {
+                                            "contentText": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.contentText.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.contentText.markdownDescription%"
+                                            },
+                                            "contentIconPath": {
+                                                "anyOf": [
+                                                    {
+                                                        "type": "string"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "uri": {
+                                                                "type": "string",
+                                                                "format": "uri",
+                                                                "title": "%tag-lens.configuration.decorationStyles[*].uri.title%",
+                                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].uri.markdownDescription%"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "uri"
+                                                        ],
+                                                        "additionalProperties": false
+                                                    }
+                                                ],
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.contentIconPath.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.contentIconPath.markdownDescription%"
+                                            },
+                                            "border": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.border.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.border.markdownDescription%"
+                                            },
+                                            "borderColor": {
+                                                "anyOf": [
+                                                    {
+                                                        "type": "string"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "themeColor": {
+                                                                "type": "string",
+                                                                "title": "%tag-lens.configuration.decorationStyles[*].themeColor.title%",
+                                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themeColor.markdownDescription%"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "themeColor"
+                                                        ],
+                                                        "additionalProperties": false
+                                                    }
+                                                ],
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.borderColor.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.borderColor.markdownDescription%"
+                                            },
+                                            "fontStyle": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.fontStyle.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.fontStyle.markdownDescription%"
+                                            },
+                                            "fontWeight": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.fontWeight.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.fontWeight.markdownDescription%"
+                                            },
+                                            "textDecoration": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.textDecoration.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.textDecoration.markdownDescription%"
+                                            },
+                                            "color": {
+                                                "anyOf": [
+                                                    {
+                                                        "type": "string"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "themeColor": {
+                                                                "type": "string",
+                                                                "title": "%tag-lens.configuration.decorationStyles[*].themeColor.title%",
+                                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themeColor.markdownDescription%"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "themeColor"
+                                                        ],
+                                                        "additionalProperties": false
+                                                    }
+                                                ],
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.color.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.color.markdownDescription%"
+                                            },
+                                            "backgroundColor": {
+                                                "anyOf": [
+                                                    {
+                                                        "type": "string"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "themeColor": {
+                                                                "type": "string",
+                                                                "title": "%tag-lens.configuration.decorationStyles[*].themeColor.title%",
+                                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themeColor.markdownDescription%"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "themeColor"
+                                                        ],
+                                                        "additionalProperties": false
+                                                    }
+                                                ],
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.backgroundColor.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.backgroundColor.markdownDescription%"
+                                            },
+                                            "margin": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.margin.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.margin.markdownDescription%"
+                                            },
+                                            "width": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.width.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.width.markdownDescription%"
+                                            },
+                                            "height": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.height.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.height.markdownDescription%"
+                                            }
+                                        },
+                                        "additionalProperties": false,
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.before.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.before.markdownDescription%"
+                                    },
+                                    "after": {
+                                        "type": "object",
+                                        "properties": {
+                                            "contentText": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.contentText.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.contentText.markdownDescription%"
+                                            },
+                                            "contentIconPath": {
+                                                "anyOf": [
+                                                    {
+                                                        "type": "string"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "uri": {
+                                                                "type": "string",
+                                                                "format": "uri",
+                                                                "title": "%tag-lens.configuration.decorationStyles[*].uri.title%",
+                                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].uri.markdownDescription%"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "uri"
+                                                        ],
+                                                        "additionalProperties": false
+                                                    }
+                                                ],
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.contentIconPath.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.contentIconPath.markdownDescription%"
+                                            },
+                                            "border": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.border.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.border.markdownDescription%"
+                                            },
+                                            "borderColor": {
+                                                "anyOf": [
+                                                    {
+                                                        "type": "string"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "themeColor": {
+                                                                "type": "string",
+                                                                "title": "%tag-lens.configuration.decorationStyles[*].themeColor.title%",
+                                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themeColor.markdownDescription%"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "themeColor"
+                                                        ],
+                                                        "additionalProperties": false
+                                                    }
+                                                ],
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.borderColor.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.borderColor.markdownDescription%"
+                                            },
+                                            "fontStyle": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.fontStyle.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.fontStyle.markdownDescription%"
+                                            },
+                                            "fontWeight": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.fontWeight.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.fontWeight.markdownDescription%"
+                                            },
+                                            "textDecoration": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.textDecoration.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.textDecoration.markdownDescription%"
+                                            },
+                                            "color": {
+                                                "anyOf": [
+                                                    {
+                                                        "type": "string"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "themeColor": {
+                                                                "type": "string",
+                                                                "title": "%tag-lens.configuration.decorationStyles[*].themeColor.title%",
+                                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themeColor.markdownDescription%"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "themeColor"
+                                                        ],
+                                                        "additionalProperties": false
+                                                    }
+                                                ],
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.color.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.color.markdownDescription%"
+                                            },
+                                            "backgroundColor": {
+                                                "anyOf": [
+                                                    {
+                                                        "type": "string"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "themeColor": {
+                                                                "type": "string",
+                                                                "title": "%tag-lens.configuration.decorationStyles[*].themeColor.title%",
+                                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themeColor.markdownDescription%"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "themeColor"
+                                                        ],
+                                                        "additionalProperties": false
+                                                    }
+                                                ],
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.backgroundColor.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.backgroundColor.markdownDescription%"
+                                            },
+                                            "margin": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.margin.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.margin.markdownDescription%"
+                                            },
+                                            "width": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.width.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.width.markdownDescription%"
+                                            },
+                                            "height": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.height.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.height.markdownDescription%"
+                                            }
+                                        },
+                                        "additionalProperties": false,
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.after.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.after.markdownDescription%"
+                                    }
+                                },
+                                "additionalProperties": false,
+                                "title": "%tag-lens.configuration.decorationStyles[*].decorationRenderOptions.light.title%",
+                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].decorationRenderOptions.light.markdownDescription%"
+                            },
+                            "dark": {
+                                "type": "object",
+                                "properties": {
+                                    "backgroundColor": {
+                                        "anyOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "properties": {
+                                                    "themeColor": {
+                                                        "type": "string",
+                                                        "title": "%tag-lens.configuration.decorationStyles[*].themeColor.title%",
+                                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themeColor.markdownDescription%"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "themeColor"
+                                                ],
+                                                "additionalProperties": false
+                                            }
+                                        ],
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.backgroundColor.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.backgroundColor.markdownDescription%"
+                                    },
+                                    "outline": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.outline.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.outline.markdownDescription%"
+                                    },
+                                    "outlineColor": {
+                                        "anyOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "properties": {
+                                                    "themeColor": {
+                                                        "type": "string",
+                                                        "title": "%tag-lens.configuration.decorationStyles[*].themeColor.title%",
+                                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themeColor.markdownDescription%"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "themeColor"
+                                                ],
+                                                "additionalProperties": false
+                                            }
+                                        ],
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.outlineColor.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.outlineColor.markdownDescription%"
+                                    },
+                                    "outlineStyle": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.outlineStyle.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.outlineStyle.markdownDescription%"
+                                    },
+                                    "outlineWidth": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.outlineWidth.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.outlineWidth.markdownDescription%"
+                                    },
+                                    "border": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.border.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.border.markdownDescription%"
+                                    },
+                                    "borderColor": {
+                                        "anyOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "properties": {
+                                                    "themeColor": {
+                                                        "type": "string",
+                                                        "title": "%tag-lens.configuration.decorationStyles[*].themeColor.title%",
+                                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themeColor.markdownDescription%"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "themeColor"
+                                                ],
+                                                "additionalProperties": false
+                                            }
+                                        ],
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.borderColor.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.borderColor.markdownDescription%"
+                                    },
+                                    "borderRadius": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.borderRadius.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.borderRadius.markdownDescription%"
+                                    },
+                                    "borderSpacing": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.borderSpacing.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.borderSpacing.markdownDescription%"
+                                    },
+                                    "borderStyle": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.borderStyle.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.borderStyle.markdownDescription%"
+                                    },
+                                    "borderWidth": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.borderWidth.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.borderWidth.markdownDescription%"
+                                    },
+                                    "fontStyle": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.fontStyle.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.fontStyle.markdownDescription%"
+                                    },
+                                    "fontWeight": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.fontWeight.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.fontWeight.markdownDescription%"
+                                    },
+                                    "textDecoration": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.textDecoration.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.textDecoration.markdownDescription%"
+                                    },
+                                    "cursor": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.cursor.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.cursor.markdownDescription%"
+                                    },
+                                    "color": {
+                                        "anyOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "properties": {
+                                                    "themeColor": {
+                                                        "type": "string",
+                                                        "title": "%tag-lens.configuration.decorationStyles[*].themeColor.title%",
+                                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themeColor.markdownDescription%"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "themeColor"
+                                                ],
+                                                "additionalProperties": false
+                                            }
+                                        ],
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.color.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.color.markdownDescription%"
+                                    },
+                                    "opacity": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.opacity.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.opacity.markdownDescription%"
+                                    },
+                                    "letterSpacing": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.letterSpacing.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.letterSpacing.markdownDescription%"
+                                    },
+                                    "gutterIconPath": {
+                                        "anyOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "properties": {
+                                                    "uri": {
+                                                        "type": "string",
+                                                        "format": "uri",
+                                                        "title": "%tag-lens.configuration.decorationStyles[*].uri.title%",
+                                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].uri.markdownDescription%"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "uri"
+                                                ],
+                                                "additionalProperties": false
+                                            }
+                                        ],
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.gutterIconPath.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.gutterIconPath.markdownDescription%"
+                                    },
+                                    "gutterIconSize": {
+                                        "type": "string",
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.gutterIconSize.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.gutterIconSize.markdownDescription%"
+                                    },
+                                    "overviewRulerColor": {
+                                        "anyOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "properties": {
+                                                    "themeColor": {
+                                                        "type": "string",
+                                                        "title": "%tag-lens.configuration.decorationStyles[*].themeColor.title%",
+                                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themeColor.markdownDescription%"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "themeColor"
+                                                ],
+                                                "additionalProperties": false
+                                            }
+                                        ],
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.overviewRulerColor.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.overviewRulerColor.markdownDescription%"
+                                    },
+                                    "before": {
+                                        "type": "object",
+                                        "properties": {
+                                            "contentText": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.contentText.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.contentText.markdownDescription%"
+                                            },
+                                            "contentIconPath": {
+                                                "anyOf": [
+                                                    {
+                                                        "type": "string"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "uri": {
+                                                                "type": "string",
+                                                                "format": "uri",
+                                                                "title": "%tag-lens.configuration.decorationStyles[*].uri.title%",
+                                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].uri.markdownDescription%"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "uri"
+                                                        ],
+                                                        "additionalProperties": false
+                                                    }
+                                                ],
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.contentIconPath.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.contentIconPath.markdownDescription%"
+                                            },
+                                            "border": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.border.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.border.markdownDescription%"
+                                            },
+                                            "borderColor": {
+                                                "anyOf": [
+                                                    {
+                                                        "type": "string"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "themeColor": {
+                                                                "type": "string",
+                                                                "title": "%tag-lens.configuration.decorationStyles[*].themeColor.title%",
+                                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themeColor.markdownDescription%"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "themeColor"
+                                                        ],
+                                                        "additionalProperties": false
+                                                    }
+                                                ],
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.borderColor.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.borderColor.markdownDescription%"
+                                            },
+                                            "fontStyle": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.fontStyle.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.fontStyle.markdownDescription%"
+                                            },
+                                            "fontWeight": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.fontWeight.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.fontWeight.markdownDescription%"
+                                            },
+                                            "textDecoration": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.textDecoration.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.textDecoration.markdownDescription%"
+                                            },
+                                            "color": {
+                                                "anyOf": [
+                                                    {
+                                                        "type": "string"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "themeColor": {
+                                                                "type": "string",
+                                                                "title": "%tag-lens.configuration.decorationStyles[*].themeColor.title%",
+                                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themeColor.markdownDescription%"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "themeColor"
+                                                        ],
+                                                        "additionalProperties": false
+                                                    }
+                                                ],
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.color.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.color.markdownDescription%"
+                                            },
+                                            "backgroundColor": {
+                                                "anyOf": [
+                                                    {
+                                                        "type": "string"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "themeColor": {
+                                                                "type": "string",
+                                                                "title": "%tag-lens.configuration.decorationStyles[*].themeColor.title%",
+                                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themeColor.markdownDescription%"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "themeColor"
+                                                        ],
+                                                        "additionalProperties": false
+                                                    }
+                                                ],
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.backgroundColor.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.backgroundColor.markdownDescription%"
+                                            },
+                                            "margin": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.margin.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.margin.markdownDescription%"
+                                            },
+                                            "width": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.width.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.width.markdownDescription%"
+                                            },
+                                            "height": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.height.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.height.markdownDescription%"
+                                            }
+                                        },
+                                        "additionalProperties": false,
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.before.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.before.markdownDescription%"
+                                    },
+                                    "after": {
+                                        "type": "object",
+                                        "properties": {
+                                            "contentText": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.contentText.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.contentText.markdownDescription%"
+                                            },
+                                            "contentIconPath": {
+                                                "anyOf": [
+                                                    {
+                                                        "type": "string"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "uri": {
+                                                                "type": "string",
+                                                                "format": "uri",
+                                                                "title": "%tag-lens.configuration.decorationStyles[*].uri.title%",
+                                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].uri.markdownDescription%"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "uri"
+                                                        ],
+                                                        "additionalProperties": false
+                                                    }
+                                                ],
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.contentIconPath.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.contentIconPath.markdownDescription%"
+                                            },
+                                            "border": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.border.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.border.markdownDescription%"
+                                            },
+                                            "borderColor": {
+                                                "anyOf": [
+                                                    {
+                                                        "type": "string"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "themeColor": {
+                                                                "type": "string",
+                                                                "title": "%tag-lens.configuration.decorationStyles[*].themeColor.title%",
+                                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themeColor.markdownDescription%"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "themeColor"
+                                                        ],
+                                                        "additionalProperties": false
+                                                    }
+                                                ],
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.borderColor.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.borderColor.markdownDescription%"
+                                            },
+                                            "fontStyle": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.fontStyle.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.fontStyle.markdownDescription%"
+                                            },
+                                            "fontWeight": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.fontWeight.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.fontWeight.markdownDescription%"
+                                            },
+                                            "textDecoration": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.textDecoration.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.textDecoration.markdownDescription%"
+                                            },
+                                            "color": {
+                                                "anyOf": [
+                                                    {
+                                                        "type": "string"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "themeColor": {
+                                                                "type": "string",
+                                                                "title": "%tag-lens.configuration.decorationStyles[*].themeColor.title%",
+                                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themeColor.markdownDescription%"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "themeColor"
+                                                        ],
+                                                        "additionalProperties": false
+                                                    }
+                                                ],
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.color.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.color.markdownDescription%"
+                                            },
+                                            "backgroundColor": {
+                                                "anyOf": [
+                                                    {
+                                                        "type": "string"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "themeColor": {
+                                                                "type": "string",
+                                                                "title": "%tag-lens.configuration.decorationStyles[*].themeColor.title%",
+                                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themeColor.markdownDescription%"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "themeColor"
+                                                        ],
+                                                        "additionalProperties": false
+                                                    }
+                                                ],
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.backgroundColor.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.backgroundColor.markdownDescription%"
+                                            },
+                                            "margin": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.margin.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.margin.markdownDescription%"
+                                            },
+                                            "width": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.width.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.width.markdownDescription%"
+                                            },
+                                            "height": {
+                                                "type": "string",
+                                                "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.height.title%",
+                                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationAttachmentRenderOptions.height.markdownDescription%"
+                                            }
+                                        },
+                                        "additionalProperties": false,
+                                        "title": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.after.title%",
+                                        "markdownDescription": "%tag-lens.configuration.decorationStyles[*].themableDecorationRenderOptions.after.markdownDescription%"
+                                    }
+                                },
+                                "additionalProperties": false,
+                                "title": "%tag-lens.configuration.decorationStyles[*].decorationRenderOptions.dark.title%",
+                                "markdownDescription": "%tag-lens.configuration.decorationStyles[*].decorationRenderOptions.dark.markdownDescription%"
+                            }
+                        },
+                        "additionalProperties": false
+                    }
+                },
+                "tag-lens.diagnosticStyles": {
+                    "order": 2,
+                    "title": "%tag-lens.configuration.diagnosticStyles.title%",
+                    "markdownDescription": "%tag-lens.configuration.diagnosticStyles.markdownDescription%",
+                    "type": "object",
+                    "propertyNames": {
+                        "type": "string"
+                    },
+                    "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                            "severity": {
+                                "enumItemLabels": [
+                                    "%tag-lens.configuration.diagnosticStyles[*].severity.error.itemLabel%",
+                                    "%tag-lens.configuration.diagnosticStyles[*].severity.warning.itemLabel%",
+                                    "%tag-lens.configuration.diagnosticStyles[*].severity.information.itemLabel%",
+                                    "%tag-lens.configuration.diagnosticStyles[*].severity.hint.itemLabel%"
+                                ],
+                                "markdownEnumDescriptions": [
+                                    "%tag-lens.configuration.diagnosticStyles[*].severity.error.markdownDescription%",
+                                    "%tag-lens.configuration.diagnosticStyles[*].severity.warning.markdownDescription%",
+                                    "%tag-lens.configuration.diagnosticStyles[*].severity.information.markdownDescription%",
+                                    "%tag-lens.configuration.diagnosticStyles[*].severity.hint.markdownDescription%"
+                                ],
+                                "title": "%tag-lens.configuration.diagnosticStyles[*].severity.title%",
+                                "markdownDescription": "%tag-lens.configuration.diagnosticStyles[*].severity.markdownDescription%",
+                                "type": "string",
+                                "enum": [
+                                    "error",
+                                    "warning",
+                                    "information",
+                                    "hint"
+                                ]
+                            },
+                            "customMessage": {
+                                "title": "%tag-lens.configuration.diagnosticStyles[*].customMessage.title%",
+                                "markdownDescription": "%tag-lens.configuration.diagnosticStyles[*].customMessage.markdownDescription%",
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "severity"
+                        ],
+                        "additionalProperties": false
+                    }
+                },
+                "tag-lens.rules": {
+                    "default": {},
+                    "order": 3,
+                    "title": "%tag-lens.configuration.rules.title%",
+                    "markdownDescription": "%tag-lens.configuration.rules.markdownDescription%",
+                    "type": "object",
+                    "propertyNames": {
+                        "type": "string"
+                    },
+                    "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                            "pattern": {
+                                "type": "string",
+                                "title": "%tag-lens.configuration.rules[*].pattern.title%",
+                                "markdownDescription": "%tag-lens.configuration.rules[*].pattern.markdownDescription%"
+                            },
+                            "commentContext": {
+                                "title": "%tag-lens.configuration.rules[*].commentContext.title%",
+                                "markdownDescription": "%tag-lens.configuration.rules[*].commentContext.markdownDescription%",
+                                "type": "string",
+                                "enum": [
+                                    "any",
+                                    "inComment",
+                                    "outOfComment"
+                                ],
+                                "enumItemLabels": [
+                                    "%tag-lens.configuration.rules[*].commentContext.any.itemLabel%",
+                                    "%tag-lens.configuration.rules[*].commentContext.inComment.itemLabel%",
+                                    "%tag-lens.configuration.rules[*].commentContext.outOfComment.itemLabel%"
+                                ],
+                                "markdownEnumDescriptions": [
+                                    "%tag-lens.configuration.rules[*].commentContext.any.markdownDescription%",
+                                    "%tag-lens.configuration.rules[*].commentContext.inComment.markdownDescription%",
+                                    "%tag-lens.configuration.rules[*].commentContext.outOfComment.markdownDescription%"
+                                ]
+                            },
+                            "decorationStyle": {
+                                "title": "%tag-lens.configuration.rules[*].decorationStyle.title%",
+                                "markdownDescription": "%tag-lens.configuration.rules[*].decorationStyle.markdownDescription%",
+                                "type": "string"
+                            },
+                            "diagnosticStyle": {
+                                "title": "%tag-lens.configuration.rules[*].diagnosticStyle.title%",
+                                "markdownDescription": "%tag-lens.configuration.rules[*].diagnosticStyle.markdownDescription%",
+                                "type": "string"
+                            },
+                            "languages": {
+                                "title": "%tag-lens.configuration.rules[*].languages.title%",
+                                "markdownDescription": "%tag-lens.configuration.rules[*].languages.markdownDescription%",
+                                "anyOf": [
+                                    {
+                                        "type": "string",
+                                        "const": "*"
+                                    },
+                                    {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    }
+                                ]
+                            }
+                        },
+                        "required": [
+                            "pattern"
+                        ],
+                        "additionalProperties": false
+                    }
+                },
+                "tag-lens.compactFolders": {
+                    "default": "editor",
+                    "order": 4,
+                    "title": "%tag-lens.configuration.compactFolders.title%",
+                    "markdownDescription": "%tag-lens.configuration.compactFolders.markdownDescription%",
+                    "type": "string",
+                    "enum": [
+                        "editor",
+                        "always",
+                        "never"
+                    ],
+                    "enumItemLabels": [
+                        "%tag-lens.configuration.compactFolders.editor.itemLabel%",
+                        "%tag-lens.configuration.compactFolders.always.itemLabel%",
+                        "%tag-lens.configuration.compactFolders.never.itemLabel%"
+                    ],
+                    "markdownEnumDescriptions": [
+                        "%tag-lens.configuration.compactFolders.editor.markdownDescription%",
+                        "%tag-lens.configuration.compactFolders.always.markdownDescription%",
+                        "%tag-lens.configuration.compactFolders.never.markdownDescription%"
+                    ]
+                },
+                "tag-lens.searchLoose": {
+                    "default": true,
+                    "order": 5,
+                    "title": "%tag-lens.configuration.searchLoose.title%",
+                    "markdownDescription": "%tag-lens.configuration.searchLoose.markdownDescription%",
+                    "type": "boolean"
+                },
+                "tag-lens.commentTokens": {
+                    "default": {},
+                    "order": 6,
+                    "title": "%tag-lens.configuration.commentTokens.title%",
+                    "markdownDescription": "%tag-lens.configuration.commentTokens.markdownDescription%",
+                    "type": "object",
+                    "propertyNames": {
+                        "type": "string"
+                    },
+                    "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                            "lineCommentStart": {
+                                "type": "string",
+                                "title": "%tag-lens.configuration.commentTokens[*].lineCommentStart.markdownDescription%",
+                                "markdownDescription": "%tag-lens.configuration.commentTokens[*].lineCommentStart.markdownDescription%"
+                            },
+                            "blockCommentStart": {
+                                "type": "string",
+                                "title": "%tag-lens.configuration.commentTokens[*].blockCommentStart.markdownDescription%",
+                                "markdownDescription": "%tag-lens.configuration.commentTokens[*].blockCommentStart.markdownDescription%"
+                            },
+                            "blockCommentEnd": {
+                                "type": "string",
+                                "title": "%tag-lens.configuration.commentTokens[*].blockCommentEnd.markdownDescription%",
+                                "markdownDescription": "%tag-lens.configuration.commentTokens[*].blockCommentEnd.markdownDescription%"
+                            }
+                        },
+                        "additionalProperties": false
+                    }
+                }
+            },
+            "title": "%tag-lens%"
+        },
+        "jsonValidation": [
+            {
+                "fileMatch": [
+                    "tag-lens.config.jsonc",
+                    "*.tag-lens.config.jsonc"
+                ],
+                "url": "./schema/tag-lens.config.json"
+            }
+        ],
+        "menus": {
+            "view/title": [
+                {
+                    "command": "tag-lens.rescanWorkspace",
+                    "group": "navigation",
+                    "when": "view == tag-lens.tree-view"
+                }
+            ],
+            "view/item/context": [
+                {
+                    "command": "tag-lens.toggleLooseFiles",
+                    "when": "view == tag-lens.tree-view && viewItem == looseFilesNode"
+                },
+                {
+                    "command": "tag-lens.toggleWorkspace",
+                    "when": "view == tag-lens.tree-view && viewItem == workspaceNode"
+                }
+            ]
+        },
+        "views": {
+            "tag-lens-tree-container": [
+                {
+                    "id": "tag-lens.tags-tree-view",
+                    "name": "%tag-lens.views.tags.title%",
+                    "icon": "$(list-tree)"
+                },
+                {
+                    "id": "tag-lens.sources-tree-view",
+                    "name": "%tag-lens.views.sources.title%",
+                    "icon": "$(list-tree)",
+                    "visibility": "collapsed"
+                }
+            ]
+        },
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "tag-lens-tree-container",
+                    "title": "%tag-lens%",
+                    "icon": "$(list-tree)"
+                }
+            ]
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run package",
+        "compile": "npm run check-types && npm run lint && tsx esbuild.ts",
+        "watch": "npm-run-all -p watch:*",
+        "watch:esbuild": "tsx esbuild.ts --watch",
+        "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+        "package": "npm run check-types && npm run lint && tsx esbuild.ts --production",
+        "compile-tests": "tsc -p . --outDir out",
+        "watch-tests": "tsc -p . -w --outDir out",
+        "pretest": "npm run compile-tests && npm run compile && npm run lint",
+        "check-types": "tsc --noEmit && tsc --noEmit -p src/webview/tsconfig.json",
+        "lint": "biome check",
+        "test": "vscode-test",
+        "typesafe-i18n": "typesafe-i18n"
+    },
+    "devDependencies": {
+        "@babel/helper-validator-identifier": "^8.0.6",
+        "@biomejs/biome": "^2.4.16",
+        "@types/mocha": "^10.0.10",
+        "@types/node": "^22.20.0",
+        "@types/react": "^19.2.18",
+        "@types/react-dom": "^19.2.5",
+        "@types/vscode": "^1.110.0",
+        "@vscode/test-cli": "^0.0.15",
+        "@vscode/test-electron": "^3.0.0",
+        "change-case": "^5.4.4",
+        "esbuild": "^0.28.1",
+        "esbuild-plugin-copy": "^2.1.1",
+        "npm-run-all": "^4.1.5",
+        "tsx": "^4.23.15",
+        "typescript": "^6.0.3",
+        "vscode-manifest-types": "github:RichardRobertson/vscode-manifest-types#v0.4.0"
+    },
+    "dependencies": {
+        "@tanstack/react-table": "^8.21.3",
+        "@vscode-elements/elements": "^2.5.1",
+        "@vscode/codicons": "^0.0.45",
+        "jsonc-parser": "^3.3.1",
+        "p-queue": "^9.3.0",
+        "pseudo-localization": "^3.1.3",
+        "re2js": "^2.8.3",
+        "react": "^19.2.8",
+        "react-dom": "^19.2.8",
+        "react-error-boundary": "^6.1.3",
+        "tag-lens-rs": "file:../tag-lens-rs/pkg",
+        "typesafe-i18n": "^5.27.1",
+        "zod": "^4.4.3"
+    },
+    "allowScripts": {
+        "esbuild": true
+    }
+}
